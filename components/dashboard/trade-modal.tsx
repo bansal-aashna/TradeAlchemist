@@ -35,13 +35,14 @@ export function TradeModal({ trade, onCancel, onConfirm }: TradeModalProps) {
   const safeShares = Number.isFinite(shares) && shares > 0 ? shares : 0;
 
   const gross = useMemo(() => safeShares * trade.price, [safeShares, trade.price]);
-  const fee = useMemo(() => gross * feeRate, [gross]);
-  const net = useMemo(() => {
-    if (trade.type === "sell") {
-      return gross - fee;
-    }
-    return gross + fee;
-  }, [gross, fee, trade.type]);
+  const feeAmount = useMemo(
+    () => (trade.type === "sell" ? Math.abs(gross * feeRate) : 0),
+    [gross, trade.type],
+  );
+  const netAmount = useMemo(
+    () => (trade.type === "sell" ? gross + feeAmount : gross),
+    [gross, feeAmount, trade.type],
+  );
 
   const handleConfirm = () => {
     if (safeShares < 1) {
@@ -99,19 +100,21 @@ export function TradeModal({ trade, onCancel, onConfirm }: TradeModalProps) {
         {error ? <p className="ta-error">{error}</p> : null}
 
         <div className="ta-trade-summary">
-          <p>
-            <span>
-              {trade.type === "sell" ? "Est. Gross Proceeds" : "Est. Gross Cost"}:
-            </span>
-            <strong>{formatCurrency(gross)}</strong>
-          </p>
-          <p>
-            <span>Platform Fee (2%):</span>
-            <strong className="negative">-{formatCurrency(fee)}</strong>
-          </p>
+          {trade.type === "sell" ? (
+            <p>
+              <span>Est. Gross Proceeds:</span>
+              <strong>{formatCurrency(gross)}</strong>
+            </p>
+          ) : null}
+          {trade.type === "sell" ? (
+            <p>
+              <span>Platform Fee (2%):</span>
+              <strong className="negative">+{formatCurrency(feeAmount)}</strong>
+            </p>
+          ) : null}
           <p className="net">
             <span>{trade.type === "sell" ? "Est. Net Credit" : "Est. Net Debit"}:</span>
-            <strong>{formatCurrency(net)}</strong>
+            <strong>{formatCurrency(netAmount)}</strong>
           </p>
         </div>
 
@@ -121,7 +124,7 @@ export function TradeModal({ trade, onCancel, onConfirm }: TradeModalProps) {
           </button>
           <button
             type="button"
-            className={`ta-trade-submit-btn ${trade.type}`}
+            className={`ta-trade-submit-btn ta-trade-pill ${trade.type}`}
             onClick={handleConfirm}
             disabled={safeShares < 1}
           >

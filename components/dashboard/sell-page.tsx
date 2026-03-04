@@ -29,7 +29,6 @@ export const SellPage = memo(function SellPage({ holdings, onTradeAction }: Sell
   return (
     <section className="ta-dashboard-content ta-sell-page">
       <h2>Sell</h2>
-      <p className="ta-portfolio-subtitle">Select a holding and place a sell order.</p>
 
       <div className="ta-holdings-table-wrap">
         <table className="ta-holdings-table">
@@ -64,7 +63,7 @@ export const SellPage = memo(function SellPage({ holdings, onTradeAction }: Sell
                     <td>
                       <button
                         type="button"
-                        className="ta-type-pill sell ta-sell-pill-btn"
+                        className="ta-trade-pill sell ta-sell-pill-btn"
                         disabled={!canSell}
                         onClick={() => {
                           if (!holding.currentPrice) {

@@ -57,7 +57,6 @@ export const PortfolioOverview = memo(function PortfolioOverview({
   return (
     <section className="ta-dashboard-content">
       <h2>Portfolio</h2>
-      <p className="ta-portfolio-subtitle">Live values will appear here once trading backend is connected. </p>
 
       <div className="ta-portfolio-grid">
         {portfolioFields.map((field) => {

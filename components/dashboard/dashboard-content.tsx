@@ -13,8 +13,10 @@ import {
   type TransactionRecord,
 } from "@/components/dashboard/transaction-history-table";
 import { MarketWatch } from "@/components/market-watch/market-watch";
+import { ChartsPage } from "@/components/dashboard/charts-page";
 import type { DashboardTab } from "@/components/dashboard/tabs";
 import { buyStocksSample } from "@/lib/sample-data/buy-stocks";
+import { chartStocksSample } from "@/lib/sample-data/chart-stocks";
 
 type DashboardContentProps = {
   activeTab: DashboardTab;
@@ -49,11 +51,23 @@ export const DashboardContent = memo(function DashboardContent({
   }
 
   if (activeTab === "Market Watch") {
-    return <MarketWatch isDarkMode={isDarkMode} onTradeAction={onTradeAction} />;
+    return (
+      <MarketWatch
+        isDarkMode={isDarkMode}
+        holdings={holdings}
+        onTradeAction={onTradeAction}
+      />
+    );
   }
 
   if (activeTab === "Buy") {
-    return <BuyPage stocks={buyStocksSample} onTradeAction={onTradeAction} />;
+    return (
+      <BuyPage
+        stocks={buyStocksSample}
+        holdings={holdings}
+        onTradeAction={onTradeAction}
+      />
+    );
   }
 
   if (activeTab === "Sell") {
@@ -62,6 +76,10 @@ export const DashboardContent = memo(function DashboardContent({
 
   if (activeTab === "Transaction History") {
     return <TransactionHistoryTable transactions={transactions} />;
+  }
+
+  if (activeTab === "Charts") {
+    return <ChartsPage stocks={chartStocksSample} />;
   }
 
   return null;

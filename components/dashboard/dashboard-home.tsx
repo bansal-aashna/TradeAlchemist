@@ -131,7 +131,7 @@ export const DashboardHome = memo(function DashboardHome({
           <div className="ta-dashboard-home-actions">
             <button
               type="button"
-              className="ta-buy-action-btn buy"
+              className="ta-buy-action-btn ta-trade-pill buy"
               disabled={!selectedStock?.currentPrice}
               onClick={() => {
                 if (!selectedStock?.currentPrice) {
@@ -234,7 +234,7 @@ export const DashboardHome = memo(function DashboardHome({
                       <td>
                         <button
                           type="button"
-                          className="ta-table-action"
+                          className="ta-table-action ta-trade-pill buy"
                           onClick={() => {
                             if (!stock.currentPrice) {
                               return;

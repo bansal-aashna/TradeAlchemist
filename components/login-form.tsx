@@ -48,7 +48,7 @@ export function LoginForm() {
   };
 
   return (
-    <main className="ta-shell">
+   <main className="ta-shell ta-auth-page">
       <Card>
         <div className="ta-brand-row">
           <div className="ta-logo">

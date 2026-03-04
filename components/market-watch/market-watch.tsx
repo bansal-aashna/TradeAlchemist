@@ -2,6 +2,7 @@
 
 import { memo, useMemo, useState } from "react";
 import type { TradeDraft } from "@/components/dashboard/trade-modal";
+import type { PortfolioHolding } from "@/components/dashboard/portfolio-overview";
 
 type StockMeta = {
   symbol: string;
@@ -20,6 +21,7 @@ type StockMeta = {
 type MarketWatchProps = {
   stocks?: StockMeta[];
   isDarkMode: boolean;
+  holdings?: PortfolioHolding[];
   onTradeAction: (trade: TradeDraft) => void;
 };
 
@@ -71,6 +73,7 @@ const sampleStocks: StockMeta[] = [
 export const MarketWatch = memo(function MarketWatch({
   stocks = sampleStocks,
   isDarkMode,
+  holdings,
   onTradeAction,
 }: MarketWatchProps) {
 
@@ -160,15 +163,11 @@ export const MarketWatch = memo(function MarketWatch({
               ))
             ) : (
               <p className="ta-market-watch-note">
-                No matching stocks found. Connect stock metadata to enable search results.
+                No matching stocks found. 
               </p>
             )}
           </div>
-        ) : (
-          <p className="ta-market-watch-note">
-            No backend connected yet. Once your stock metadata is wired, results will appear here.
-          </p>
-        )}
+        ) : null}
 
         <div className="ta-holdings-table-wrap">
           <table className="ta-holdings-table">
@@ -192,7 +191,12 @@ export const MarketWatch = memo(function MarketWatch({
             </thead>
             <tbody>
               {watchlistStocks.length > 0 ? (
-                watchlistStocks.map((stock) => (
+                watchlistStocks.map((stock) => {
+                  const availableShares =
+                    holdings?.find((holding) => holding.ticker === stock.symbol)?.quantity ?? 0;
+                  const canSell = availableShares > 0;
+
+                  return (
                   <tr key={`${stock.exchange}-${stock.symbol}`}>
                     <td>{stock.symbol}</td>
                     <td>{stock.companyName}</td>
@@ -222,7 +226,7 @@ export const MarketWatch = memo(function MarketWatch({
                       <div className="ta-trade-cell">
                         <button
                           type="button"
-                          className="ta-table-action"
+                          className="ta-table-action ta-trade-pill buy"
                           onClick={() =>
                             onTradeAction({
                               ticker: stock.symbol,
@@ -236,14 +240,15 @@ export const MarketWatch = memo(function MarketWatch({
                         </button>
                         <button
                           type="button"
-                          className="ta-table-action danger"
+                          className="ta-table-action ta-trade-pill sell"
+                          disabled={!canSell}
                           onClick={() =>
                             onTradeAction({
                               ticker: stock.symbol,
                               company: stock.companyName,
                               price: stock.currentPrice,
                               type: "sell",
-                              maxShares: 5,
+                              maxShares: availableShares,
                             })
                           }
                         >
@@ -255,6 +260,7 @@ export const MarketWatch = memo(function MarketWatch({
                     {/* DELETE BUTTON */}
                     <td>
                       <button
+                        type="button"
                         className="ta-delete-icon"
                         onClick={() =>
                           removeFromWatchlist(stock.symbol, stock.exchange)
@@ -269,10 +275,11 @@ export const MarketWatch = memo(function MarketWatch({
                       </button>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan={4} className="ta-holdings-empty">
+                  <td colSpan={13} className="ta-holdings-empty">
                     No stocks in watchlist yet.
                   </td>
                 </tr>
