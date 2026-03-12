@@ -1,11 +1,8 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
-import type { ChartStock } from "@/lib/sample-data/chart-stocks";
-
-type ChartsPageProps = {
-  stocks: ChartStock[];
-};
+import { memo, useEffect, useMemo, useState } from "react";
+import { getStockHistory, searchStocks, type ApiOHLCPoint, type ApiStock } from "@/lib/api";
+import { EXCHANGE_OPTIONS, type ExchangeId } from "@/lib/exchanges";
 const rangeOptions = ["1D", "5D", "1M", "6M", "YTD", "1Y", "5Y"] as const;
 type RangeOption = (typeof rangeOptions)[number];
 
@@ -66,7 +63,7 @@ function chartPath(values: number[], width: number, height: number) {
   return { path, min, max };
 }
 
-function getSeriesByRange(series: ChartStock["ohlc"], range: RangeOption) {
+function getSeriesByRange(series: ApiOHLCPoint[], range: RangeOption) {
   if (series.length === 0) {
     return series;
   }
@@ -93,37 +90,95 @@ function getSeriesByRange(series: ChartStock["ohlc"], range: RangeOption) {
   return series.filter((point) => new Date(point.date) >= from);
 }
 
-export const ChartsPage = memo(function ChartsPage({ stocks }: ChartsPageProps) {
-  const exchanges = useMemo(
-    () => Array.from(new Set(stocks.map((stock) => stock.exchange))),
-    [stocks],
-  );
-  const [selectedExchange, setSelectedExchange] = useState<string>(
-    exchanges[0] ?? "",
+export const ChartsPage = memo(function ChartsPage() {
+  const [stocks, setStocks] = useState<ApiStock[]>([]);
+  const [selectedExchange, setSelectedExchange] = useState<ExchangeId>(
+    EXCHANGE_OPTIONS[0].id,
   );
   const [query, setQuery] = useState("");
+  const [selectedSymbol, setSelectedSymbol] = useState("");
   const [activeRange, setActiveRange] = useState<RangeOption>("5Y");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [historySeries, setHistorySeries] = useState<ApiOHLCPoint[]>([]);
+  const [isLoadingStocks, setIsLoadingStocks] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-  const filtered = useMemo(() => {
-    const text = query.trim().toLowerCase();
-    return stocks.filter((stock) => {
-      const exchangeMatch = selectedExchange
-        ? stock.exchange === selectedExchange
-        : true;
-      if (!text) {
-        return exchangeMatch;
+  useEffect(() => {
+    let active = true;
+
+    const loadStocks = async () => {
+      setIsLoadingStocks(true);
+      try {
+        const results = await searchStocks({
+          exchange: selectedExchange,
+          q: query.trim() || undefined,
+        });
+        if (!active) return;
+        setStocks(results);
+      } catch {
+        if (!active) return;
+        setStocks([]);
+      } finally {
+        if (active) setIsLoadingStocks(false);
       }
-      return (
-        exchangeMatch &&
-        (stock.symbol.toLowerCase().includes(text) ||
-          stock.companyName.toLowerCase().includes(text))
-      );
-    });
-  }, [stocks, selectedExchange, query]);
+    };
 
-  const selected = filtered[0] ?? stocks[0];
-  const rangeSeries = getSeriesByRange(selected?.ohlc ?? [], activeRange);
+    const timeout = window.setTimeout(loadStocks, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [selectedExchange, query]);
+
+  useEffect(() => {
+    if (stocks.length === 0 || !query.trim()) {
+      setSelectedSymbol("");
+      return;
+    }
+    const hasCurrentSelection = stocks.some((stock) => stock.symbol === selectedSymbol);
+    if (!hasCurrentSelection) {
+      setSelectedSymbol("");
+    }
+  }, [selectedSymbol, stocks]);
+
+  const selected = useMemo(
+    () => stocks.find((stock) => stock.symbol === selectedSymbol),
+    [selectedSymbol, stocks],
+  );
+  const stockCurrency = selected?.currency ?? "USD";
+
+  useEffect(() => {
+    let active = true;
+    const loadHistory = async () => {
+      if (!selected?.symbol) {
+        setHistorySeries([]);
+        return;
+      }
+      setIsLoadingHistory(true);
+      try {
+        const results = await getStockHistory({
+          symbol: selected.symbol,
+          range: activeRange,
+        });
+        if (!active) return;
+        setHistorySeries(results);
+      } catch {
+        if (!active) return;
+        setHistorySeries([]);
+      } finally {
+        if (active) setIsLoadingHistory(false);
+      }
+    };
+    void loadHistory();
+    return () => {
+      active = false;
+    };
+  }, [selected?.symbol, activeRange]);
+
+  const rangeSeries = useMemo(
+    () => getSeriesByRange(historySeries, activeRange),
+    [historySeries, activeRange],
+  );
   const closes = rangeSeries.map((row) => row.close) ?? [];
   const geometry = chartPath(closes, 980, 280);
   const d = geometry.path;
@@ -132,8 +187,8 @@ export const ChartsPage = memo(function ChartsPage({ stocks }: ChartsPageProps) 
   const diff = latest && first ? latest.close - first.close : 0;
   const diffPct = first && first.close !== 0 ? (diff / first.close) * 100 : 0;
   const tone = diff >= 0 ? "positive" : "negative";
-  const high52w = Math.max(...(selected?.ohlc.slice(-252).map((row) => row.high) ?? [0]));
-  const low52w = Math.min(...(selected?.ohlc.slice(-252).map((row) => row.low) ?? [0]));
+  const high52w = Math.max(...(historySeries.slice(-252).map((row) => row.high) ?? [0]));
+  const low52w = Math.min(...(historySeries.slice(-252).map((row) => row.low) ?? [0]));
   const activePoint =
     hoverIndex !== null && rangeSeries[hoverIndex] ? rangeSeries[hoverIndex] : latest;
   const chartDate = formatChartDate(activePoint?.date);
@@ -185,11 +240,16 @@ export const ChartsPage = memo(function ChartsPage({ stocks }: ChartsPageProps) 
             <select
               className="ta-buy-select"
               value={selectedExchange}
-              onChange={(event) => setSelectedExchange(event.target.value)}
+              onChange={(event) => {
+                setSelectedExchange(event.target.value as ExchangeId);
+                setQuery("");
+                setSelectedSymbol("");
+                setHoverIndex(null);
+              }}
             >
-              {exchanges.map((exchange) => (
-                <option key={exchange} value={exchange}>
-                  {exchange}
+              {EXCHANGE_OPTIONS.map((exchange) => (
+                <option key={exchange.id} value={exchange.id}>
+                  {exchange.label}
                 </option>
               ))}
             </select>
@@ -201,14 +261,21 @@ export const ChartsPage = memo(function ChartsPage({ stocks }: ChartsPageProps) 
             <input
               className="ta-buy-search-input"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setSelectedSymbol("");
+              }}
               placeholder="Search stock by symbol or company"
             />
             {query ? (
               <button
                 type="button"
                 className="ta-buy-search-clear"
-                onClick={() => setQuery("")}
+                onClick={() => {
+                  setQuery("");
+                  setSelectedSymbol("");
+                  setHoverIndex(null);
+                }}
                 aria-label="Clear search"
               >
                 x
@@ -217,11 +284,46 @@ export const ChartsPage = memo(function ChartsPage({ stocks }: ChartsPageProps) 
           </div>
         </div>
       </div>
+      {query.trim() && !selectedSymbol ? (
+        <div className="ta-watch-search-results">
+          {stocks.length > 0 ? (
+            stocks.slice(0, 12).map((stock) => (
+              <button
+                key={`${stock.exchange}-${stock.symbol}`}
+                type="button"
+                className="ta-watch-result-item"
+                onClick={() => {
+                  setSelectedSymbol(stock.symbol);
+                  setQuery(stock.symbol);
+                }}
+              >
+                <div>
+                  <p className="ta-watch-preview-symbol">{stock.symbol}</p>
+                  <p className="ta-watch-preview-name">
+                    {stock.companyName} ({stock.exchange})
+                  </p>
+                </div>
+              </button>
+            ))
+          ) : (
+            <p className="ta-market-watch-note">No matching stocks from backend.</p>
+          )}
+        </div>
+      ) : null}
 
+      {selected ? (
       <article className="ta-dashboard-section-card ta-charts-shell">
+        {!selected ? (
+          <p className="ta-market-watch-note">
+            {isLoadingStocks ? "Loading stocks..." : "No stocks returned from backend."}
+          </p>
+        ) : null}
+        <p className="ta-charts-stock-name">
+          {selected ? `${selected.symbol} - ${selected.companyName}` : "--"}
+        </p>
         <p className="ta-charts-price">
-          {formatCurrency(latest?.close, selected?.currency ?? "USD")}{" "}
-          <span>{selected?.currency ?? "USD"}</span>
+          {formatCurrency(latest?.close, stockCurrency)}{" "}
+          <span>{stockCurrency}</span>
         </p>
         <p className={`ta-charts-change ${tone}`}>
           {diff >= 0 ? "+" : ""}
@@ -254,7 +356,7 @@ export const ChartsPage = memo(function ChartsPage({ stocks }: ChartsPageProps) 
             className="ta-charts-tooltip"
             style={{ left: `${tooltipXPct}%`, top: `${tooltipYPct}%` }}
           >
-            {formatCurrency(chartPrice, selected?.currency ?? "USD")} {chartDate}
+            {formatCurrency(chartPrice, stockCurrency)} {chartDate}
           </div>
 
           <svg
@@ -296,27 +398,37 @@ export const ChartsPage = memo(function ChartsPage({ stocks }: ChartsPageProps) 
 
         <div className="ta-charts-stats-grid">
           <p>Open</p>
-          <p>{formatCurrency(latest?.open, selected?.currency ?? "USD")}</p>
-          <p>Mkt cap</p>
-          <p>{selected?.marketCap ?? "--"}</p>
-          <p>Dividend</p>
-          <p>{selected ? `${selected.dividendYield.toFixed(2)}%` : "--"}</p>
+          <p>{formatCurrency(latest?.open, stockCurrency)}</p>
+          <p>Avg Volatility</p>
+          <p>{selected?.avgVolatility?.toFixed(2) ?? "--"}</p>
+          <p>Median Close</p>
+          <p>{formatCurrency(selected?.medianClose, stockCurrency)}</p>
 
           <p>High</p>
-          <p>{formatCurrency(latest?.high, selected?.currency ?? "USD")}</p>
-          <p>P/E ratio</p>
-          <p>{selected ? selected.peRatio.toFixed(2) : "--"}</p>
+          <p>{formatCurrency(latest?.high, stockCurrency)}</p>
+          <p>Std Dev Close</p>
+          <p>{selected?.stdDevClose?.toFixed(2) ?? "--"}</p>
           <p>52-wk high</p>
-          <p>{formatCurrency(high52w, selected?.currency ?? "USD")}</p>
+          <p>{formatCurrency(selected?.fiftyTwoWeekHigh ?? high52w, stockCurrency)}</p>
 
           <p>Low</p>
-          <p>{formatCurrency(latest?.low, selected?.currency ?? "USD")}</p>
+          <p>{formatCurrency(latest?.low, stockCurrency)}</p>
           <p>52-wk low</p>
-          <p>{formatCurrency(low52w, selected?.currency ?? "USD")}</p>
+          <p>{formatCurrency(selected?.fiftyTwoWeekLow ?? low52w, stockCurrency)}</p>
           <p>Volume</p>
-          <p>{latest?.volume?.toLocaleString() ?? "--"}</p>
+          <p>
+            {isLoadingHistory
+              ? "Loading..."
+              : (selected?.avgVolume ?? latest?.volume)?.toLocaleString() ?? "--"}
+          </p>
+
+          <p>Sector</p>
+          <p>{selected?.sector ?? "--"}</p>
+          <p>Industry</p>
+          <p>{selected?.industry ?? "--"}</p>
         </div>
       </article>
+      ) : null}
     </section>
   );
 });

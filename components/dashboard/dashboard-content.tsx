@@ -15,8 +15,6 @@ import {
 import { MarketWatch } from "@/components/market-watch/market-watch";
 import { ChartsPage } from "@/components/dashboard/charts-page";
 import type { DashboardTab } from "@/components/dashboard/tabs";
-import { buyStocksSample } from "@/lib/sample-data/buy-stocks";
-import { chartStocksSample } from "@/lib/sample-data/chart-stocks";
 
 type DashboardContentProps = {
   activeTab: DashboardTab;
@@ -40,7 +38,6 @@ export const DashboardContent = memo(function DashboardContent({
       <DashboardHome
         holdings={holdings}
         transactions={transactions}
-        stocks={buyStocksSample}
         onTradeAction={onTradeAction}
       />
     );
@@ -63,7 +60,6 @@ export const DashboardContent = memo(function DashboardContent({
   if (activeTab === "Buy") {
     return (
       <BuyPage
-        stocks={buyStocksSample}
         holdings={holdings}
         onTradeAction={onTradeAction}
       />
@@ -78,8 +74,8 @@ export const DashboardContent = memo(function DashboardContent({
     return <TransactionHistoryTable transactions={transactions} />;
   }
 
-  if (activeTab === "Charts") {
-    return <ChartsPage stocks={chartStocksSample} />;
+  if (activeTab === "Analysis") {
+    return <ChartsPage />;
   }
 
   return null;

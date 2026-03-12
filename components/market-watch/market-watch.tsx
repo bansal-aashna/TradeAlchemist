@@ -1,100 +1,63 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import type { TradeDraft } from "@/components/dashboard/trade-modal";
 import type { PortfolioHolding } from "@/components/dashboard/portfolio-overview";
-
-type StockMeta = {
-  symbol: string;
-  companyName: string;
-  exchange: string;
-  lastPrice: number;
-  currentPrice: number;
-  change: number;
-  percentChange: number;
-  open: number;
-  dayHigh: number;
-  dayLow: number;
-  volume: number;
-};
+import { searchStocks, type ApiStock } from "@/lib/api";
+import { EXCHANGE_OPTIONS, type ExchangeId } from "@/lib/exchanges";
 
 type MarketWatchProps = {
-  stocks?: StockMeta[];
   isDarkMode: boolean;
   holdings?: PortfolioHolding[];
   onTradeAction: (trade: TradeDraft) => void;
 };
 
-const sampleStocks: StockMeta[] = [
-  {
-    symbol: "AAPL",
-    companyName: "Apple Inc.",
-    exchange: "NASDAQ",
-    lastPrice: 2875.50,
-    currentPrice: 2890.20,
-    change: 18.75,
-    percentChange: 0.66,
-    open: 2850.00,
-    dayHigh: 2892.00,
-    dayLow: 2841.20,
-    volume: 4123456,
-  },
-
-  {
-    symbol: "TSLA",
-    companyName: "Tesla Inc.",
-    exchange: "NASDAQ",
-    lastPrice: 2875.50,
-    currentPrice: 2890.20,
-    change: 18.75,
-    percentChange: 0.66,
-    open: 2850.00,
-    dayHigh: 2892.00,
-    dayLow: 2841.20,
-    volume: 4123456,
-
-  },
-  {
-    symbol: "RELIANCE",
-    companyName: "Reliance Industries Ltd.",
-    exchange: "NSE",
-    lastPrice: 2875.50,
-    currentPrice: 2890.20,
-    change: -18.75,
-    percentChange: -0.66,
-    open: 2850.00,
-    dayHigh: 2892.00,
-    dayLow: 2841.20,
-    volume: 4123456,
-
-  },
-];
-
 export const MarketWatch = memo(function MarketWatch({
-  stocks = sampleStocks,
   isDarkMode,
   holdings,
   onTradeAction,
 }: MarketWatchProps) {
-
+  const [selectedExchange, setSelectedExchange] = useState<ExchangeId>("NSE");
   const [query, setQuery] = useState("");
-  const [watchlistStocks, setWatchlistStocks] = useState<StockMeta[]>([]);
+  const [searchResults, setSearchResults] = useState<ApiStock[]>([]);
+  const [watchlistStocks, setWatchlistStocks] = useState<ApiStock[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const loadStocks = async () => {
+      const trimmed = query.trim();
+      if (!trimmed) {
+        setSearchResults([]);
+        return;
+      }
+      try {
+        const results = await searchStocks({
+          exchange: selectedExchange,
+          q: trimmed,
+        });
+        if (!active) {
+          return;
+        }
+        setSearchResults(results);
+      } catch {
+        if (!active) {
+          return;
+        }
+        setSearchResults([]);
+      }
+    };
+    const timeout = window.setTimeout(loadStocks, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [query, selectedExchange]);
 
   const filteredStocks = useMemo(() => {
-    const trimmed = query.trim().toLowerCase();
-    if (!trimmed) {
-      return [];
-    }
+    return searchResults.filter((stock) => stock.symbol && stock.companyName);
+  }, [searchResults]);
 
-    return stocks.filter(
-      (stock) =>
-        stock.symbol.toLowerCase().includes(trimmed) ||
-        stock.companyName.toLowerCase().includes(trimmed) ||
-        stock.exchange.toLowerCase().includes(trimmed),
-    );
-  }, [query, stocks]);
-
-  const addToWatchlist = (stock: StockMeta) => {
+  const addToWatchlist = (stock: ApiStock) => {
     setWatchlistStocks((previous) => {
       const exists = previous.some(
         (item) => item.symbol === stock.symbol && item.exchange === stock.exchange,
@@ -119,27 +82,45 @@ export const MarketWatch = memo(function MarketWatch({
         <h2 className="ta-watch-main-title">Market Watch</h2>
 
         <div className="ta-watch-search-card">
-          <div className="ta-watch-search-input-wrap">
-            <span className="ta-watch-search-icon">⌕</span>
-
-            <input
-              className="ta-watch-search-input"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Ticker to watch..."
-            />
-
-            {query ? (
-              <button
-                type="button"
-                className="ta-watch-search-clear"
-                onClick={() => setQuery("")}
-                aria-label="Clear search"
+          <div className="ta-buy-search-row">
+            <div className="ta-buy-select-wrap">
+              <select
+                className="ta-buy-select"
+                value={selectedExchange}
+                onChange={(event) => {
+                  setSelectedExchange(event.target.value as ExchangeId);
+                  setQuery("");
+                }}
               >
-                x
-              </button>
-            ) : null}
+                {EXCHANGE_OPTIONS.map((exchange) => (
+                  <option key={exchange.id} value={exchange.id}>
+                    {exchange.label}
+                  </option>
+                ))}
+              </select>
+              <span className="ta-buy-select-arrow">▾</span>
+            </div>
+            <div className="ta-watch-search-input-wrap">
+              <span className="ta-watch-search-icon">⌕</span>
 
+              <input
+                className="ta-watch-search-input"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Ticker to watch..."
+              />
+
+              {query ? (
+                <button
+                  type="button"
+                  className="ta-watch-search-clear"
+                  onClick={() => setQuery("")}
+                  aria-label="Clear search"
+                >
+                  x
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
 
@@ -202,25 +183,25 @@ export const MarketWatch = memo(function MarketWatch({
                     <td>{stock.companyName}</td>
                     <td>{stock.exchange}</td>
 
-                    <td>{stock.lastPrice.toFixed(2)}</td>
+                    <td>{stock.prevClose?.toFixed(2) ?? "--"}</td>
 
-                    <td className={stock.currentPrice >= stock.open ? "positive" : "negative"}>
-                      {stock.currentPrice.toFixed(2)}
+                    <td className={(stock.currentPrice ?? 0) >= (stock.open ?? 0) ? "positive" : "negative"}>
+                      {stock.currentPrice?.toFixed(2) ?? "--"}
                     </td>
 
-                    <td className={stock.change >= 0 ? "positive" : "negative"}>
-                      {stock.change >= 0 ? "▲" : "▼"} {stock.change.toFixed(2)}
+                    <td className={(stock.change ?? 0) >= 0 ? "positive" : "negative"}>
+                      {(stock.change ?? 0) >= 0 ? "▲" : "▼"} {stock.change?.toFixed(2) ?? "--"}
                     </td>
 
-                    <td className={stock.percentChange >= 0 ? "positive" : "negative"}>
-                      {stock.percentChange >= 0 ? "+" : ""}
-                      {stock.percentChange.toFixed(2)}%
+                    <td className={(stock.percentChange ?? 0) >= 0 ? "positive" : "negative"}>
+                      {(stock.percentChange ?? 0) >= 0 ? "+" : ""}
+                      {stock.percentChange?.toFixed(2) ?? "--"}%
                     </td>
 
-                    <td>{stock.open.toFixed(2)}</td>
-                    <td>{stock.dayHigh.toFixed(2)}</td>
-                    <td>{stock.dayLow.toFixed(2)}</td>
-                    <td>{stock.volume.toLocaleString()}</td>
+                    <td>{stock.open?.toFixed(2) ?? "--"}</td>
+                    <td>{stock.high?.toFixed(2) ?? "--"}</td>
+                    <td>{stock.low?.toFixed(2) ?? "--"}</td>
+                    <td>{stock.volume?.toLocaleString() ?? "--"}</td>
 
                     <td>
                       <div className="ta-trade-cell">
@@ -231,10 +212,11 @@ export const MarketWatch = memo(function MarketWatch({
                             onTradeAction({
                               ticker: stock.symbol,
                               company: stock.companyName,
-                              price: stock.currentPrice,
+                              price: stock.currentPrice ?? 0,
                               type: "buy",
                             })
                           }
+                          disabled={!stock.currentPrice}
                         >
                           Buy
                         </button>
@@ -246,7 +228,7 @@ export const MarketWatch = memo(function MarketWatch({
                             onTradeAction({
                               ticker: stock.symbol,
                               company: stock.companyName,
-                              price: stock.currentPrice,
+                              price: stock.currentPrice ?? 0,
                               type: "sell",
                               maxShares: availableShares,
                             })
