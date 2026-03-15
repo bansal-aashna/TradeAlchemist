@@ -12,7 +12,6 @@
 1. Open the project folder in VS Code.
 
 2. Create `.env` files in: simulator_engine/.env and backend_api/.env
-3. Create '.env.local' and add the firebase api key
 
 Add:
 MONGODB_URI=your_mongodb_atlas_url_here
@@ -25,6 +24,9 @@ pip install pymongo fastapi uvicorn python-dotenv
 
 In backend_api
 pip install firebase-admin
+
+4. Create '.env.local' and add the firebase api key
+
 
 **Run**
 Start Simulator
