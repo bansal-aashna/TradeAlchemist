@@ -25,7 +25,7 @@ pip install pymongo fastapi uvicorn python-dotenv
 In backend_api
 pip install firebase-admin
 
-4. Create '.env.local' and add the firebase api key
+4. Create '.env.local' where env.example is and add the firebase api key
 
 
 **Run**
