@@ -2,14 +2,23 @@ import os
 import re
 import webbrowser
 import threading
+from datetime import datetime, timezone
 from typing import Optional
 from contextlib import asynccontextmanager
 from fastapi.responses import JSONResponse
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from db.mongo_client import live_prices, historical_prices, market_state, metadata
+from db.mongo_client import (
+    historical_prices,
+    live_prices,
+    market_state,
+    metadata,
+    portfolios,
+    users,
+)
 from trade_executor import execute_trade
+from auth_utils import get_current_user
 
 
 @asynccontextmanager
@@ -35,6 +44,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+DEFAULT_STARTING_CAPITAL = 100000
 
 EXCHANGE_TO_METADATA_CODE = {
     "NSE": "NSI",
@@ -64,6 +75,84 @@ def normalize_exchange(exchange: Optional[str]) -> Optional[str]:
         return None
     normalized = exchange.strip().upper()
     return EXCHANGE_TO_METADATA_CODE.get(normalized, normalized)
+
+
+def utc_now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+@app.get("/me")
+def get_me(current_user: dict = Depends(get_current_user)):
+    user_doc = users.find_one({"uid": current_user["uid"]}, {"_id": 0})
+    portfolio_doc = portfolios.find_one({"uid": current_user["uid"]}, {"_id": 0})
+    return {
+        "auth": current_user,
+        "user": user_doc,
+        "portfolio": portfolio_doc,
+    }
+
+
+@app.post("/me/init")
+def init_me(current_user: dict = Depends(get_current_user)):
+    now = utc_now_iso()
+    uid = current_user["uid"]
+
+    user_exists = users.find_one({"uid": uid}, {"_id": 1}) is not None
+    portfolio_exists = portfolios.find_one({"uid": uid}, {"_id": 1}) is not None
+
+    users.update_one(
+        {"uid": uid},
+        {
+            "$set": {
+                "email": current_user.get("email"),
+                "displayName": current_user.get("name"),
+                "photoURL": current_user.get("picture"),
+                "updatedAt": now,
+            },
+            "$setOnInsert": {
+                "uid": uid,
+                "createdAt": now,
+            },
+        },
+        upsert=True,
+    )
+
+    portfolios.update_one(
+        {"uid": uid},
+        {
+            "$set": {
+                "updatedAt": now,
+            },
+            "$setOnInsert": {
+                "uid": uid,
+                "buyingPower": DEFAULT_STARTING_CAPITAL,
+                "totalPortfolioValue": DEFAULT_STARTING_CAPITAL,
+                "investmentValue": 0,
+                "unrealisedPL": 0,
+                "todaysPL": 0,
+                "createdAt": now,
+            },
+        },
+        upsert=True,
+    )
+
+    user_doc = users.find_one({"uid": uid}, {"_id": 0})
+    portfolio_doc = portfolios.find_one({"uid": uid}, {"_id": 0})
+
+    return {
+        "status": "ok",
+        "created": {
+            "user": not user_exists,
+            "portfolio": not portfolio_exists,
+        },
+        "user": user_doc,
+        "portfolio": portfolio_doc,
+    }
 
 @app.get("/prices/live")
 def get_live_prices():
