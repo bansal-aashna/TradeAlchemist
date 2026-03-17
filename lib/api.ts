@@ -129,6 +129,12 @@ export type ApiTransaction = {
   dateTime: string;
 };
 
+export type ExecuteTradeRequest = {
+  symbol: string;
+  exchange: string;
+  quantity: number;
+};
+
 async function fetchJson(path: string) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "GET",
@@ -150,6 +156,41 @@ async function fetchAuthenticatedJson(path: string, token: string, method: "GET"
       Accept: "application/json",
       Authorization: `Bearer ${token}`,
     },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    let message = `Request failed with status ${response.status}`;
+    try {
+      const payload = (await response.json()) as Record<string, unknown>;
+      if (typeof payload.detail === "string") {
+        message = payload.detail;
+      } else if (typeof payload.message === "string") {
+        message = payload.message;
+      }
+    } catch {
+      // Ignore JSON parse failures and keep the HTTP status message.
+    }
+    throw new Error(message);
+  }
+
+  return response.json() as Promise<Record<string, unknown>>;
+}
+
+async function fetchAuthenticatedJsonWithBody(
+  path: string,
+  token: string,
+  method: "POST",
+  body: Record<string, unknown>,
+) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
     cache: "no-store",
   });
 
@@ -536,4 +577,12 @@ export async function removeWatchlistItem(
   if (!response.ok) {
     throw new Error(`Request failed with status ${response.status}`);
   }
+}
+
+export async function executeBuyTrade(token: string, request: ExecuteTradeRequest) {
+  return fetchAuthenticatedJsonWithBody("/trade/buy", token, "POST", request);
+}
+
+export async function executeSellTrade(token: string, request: ExecuteTradeRequest) {
+  return fetchAuthenticatedJsonWithBody("/trade/sell", token, "POST", request);
 }

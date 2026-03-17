@@ -15,6 +15,8 @@ import { type DashboardTab } from "@/components/dashboard/tabs";
 import { auth } from "@/lib/firebase";
 import {
   addWatchlistItem,
+  executeBuyTrade,
+  executeSellTrade,
   getBackendHealth,
   initCurrentUser,
   getHoldings,
@@ -133,14 +135,10 @@ export default function DashboardPage() {
   }, []);
 
   const handleTradeConfirm = useCallback(
-    (shares: number) => {
+    async (shares: number) => {
       if (!activeTrade) {
         return;
       }
-
-      const grossAmount = activeTrade.price * shares;
-      const feeAmount = activeTrade.type === "sell" ? grossAmount * 0.02 : 0;
-      const netCredit = grossAmount + feeAmount;
 
       if (activeTrade.type === "sell") {
         const availableShares =
@@ -152,91 +150,69 @@ export default function DashboardPage() {
         }
       }
 
-      if (activeTrade.type === "buy" && grossAmount > buyingPower) {
-        setTradeMessage(`Insufficient buying power. Required $${grossAmount.toFixed(2)}.`);
+      if (!activeTrade.exchange) {
+        setTradeMessage(`Exchange is missing for ${activeTrade.ticker}.`);
         return;
       }
 
-      const newTransaction: TransactionRecord = {
-        id:
-          typeof crypto !== "undefined" && "randomUUID" in crypto
-            ? crypto.randomUUID()
-            : `${Date.now()}`,
-        dateTime: new Date().toISOString(),
-        ticker: activeTrade.ticker,
-        company: activeTrade.company,
-        type: activeTrade.type,
-        shares,
-        price: activeTrade.price,
-      };
-
-      setTransactions((previous) => [newTransaction, ...previous]);
-
-      if (activeTrade.type === "buy") {
-        setBuyingPower((previous) => previous - grossAmount);
-        setTotalPortfolioValue((previous) => previous - grossAmount);
-        setHoldings((previous) => {
-          const existing = previous.find(
-            (holding) => holding.ticker === activeTrade.ticker,
-          );
-          if (!existing) {
-            return [
-              {
-                ticker: activeTrade.ticker,
-                quantity: shares,
-                holdPrice: activeTrade.price,
-                currentPrice: activeTrade.price,
-                totalPL: 0,
-              },
-              ...previous,
-            ];
-          }
-
-          const currentQty = existing.quantity ?? 0;
-          const currentHoldPrice = existing.holdPrice ?? activeTrade.price;
-          const nextQty = currentQty + shares;
-          const avgHoldPrice =
-            nextQty > 0
-              ? (currentQty * currentHoldPrice + shares * activeTrade.price) / nextQty
-              : activeTrade.price;
-          const nextCurrentPrice = activeTrade.price;
-          const nextTotalPL = (nextCurrentPrice - avgHoldPrice) * nextQty;
-
-          return previous.map((holding) =>
-            holding.ticker === activeTrade.ticker
-              ? {
-                  ...holding,
-                  quantity: nextQty,
-                  holdPrice: Number(avgHoldPrice.toFixed(2)),
-                  currentPrice: nextCurrentPrice,
-                  totalPL: Number(nextTotalPL.toFixed(2)),
-                }
-              : holding,
-          );
-        });
+      const user = auth.currentUser;
+      if (!user) {
+        setTradeMessage("Please sign in again to place a trade.");
+        return;
       }
 
-      if (activeTrade.type === "sell") {
-        setBuyingPower((previous) => previous + netCredit);
-        setTotalPortfolioValue((previous) => previous + grossAmount);
-        setHoldings((previous) =>
-          previous
-            .map((holding) => {
-              if (holding.ticker !== activeTrade.ticker) {
-                return holding;
-              }
-              const currentQty = holding.quantity ?? 0;
-              const nextQty = Math.max(0, currentQty - shares);
-              return { ...holding, quantity: nextQty };
-            })
-            .filter((holding) => (holding.quantity ?? 0) > 0),
+      try {
+        const token = await user.getIdToken();
+        const request = {
+          symbol: activeTrade.ticker,
+          exchange: activeTrade.exchange,
+          quantity: shares,
+        };
+
+        if (activeTrade.type === "buy") {
+          await executeBuyTrade(token, request);
+        } else {
+          await executeSellTrade(token, request);
+        }
+
+        const [portfolio, holdingsData, transactionsData] = await Promise.all([
+          getPortfolio(token),
+          getHoldings(token),
+          getTransactions(token),
+        ]);
+
+        setHoldings(
+          holdingsData.map((holding) => ({
+            ticker: holding.ticker,
+            companyName: holding.companyName,
+            exchange: holding.exchange,
+            displayName: holding.displayName,
+            quantity: holding.quantity,
+            currentPrice: holding.currentPrice,
+            holdPrice: holding.holdPrice,
+            totalPL: holding.totalPL,
+          })),
         );
+        setTransactions(
+          transactionsData.map((transaction) => ({
+            id: transaction.id,
+            dateTime: transaction.dateTime,
+            ticker: transaction.ticker,
+            company: transaction.company,
+            type: transaction.type,
+            shares: transaction.shares,
+            price: transaction.price,
+          })),
+        );
+        setBuyingPower(portfolio?.buyingPower ?? INITIAL_BUYING_POWER);
+        setTotalPortfolioValue(portfolio?.totalPortfolioValue ?? INITIAL_BUYING_POWER);
+        setTradeMessage(null);
+        setActiveTrade(null);
+      } catch (error) {
+        setTradeMessage(error instanceof Error ? error.message : "Trade execution failed.");
       }
-
-      setTradeMessage(null);
-      setActiveTrade(null);
     },
-    [activeTrade, buyingPower, holdings],
+    [activeTrade, holdings],
   );
 
   const portfolioMetrics: PortfolioMetrics = useMemo(() => {
@@ -427,6 +403,7 @@ export default function DashboardPage() {
           trade={activeTrade}
           onCancel={() => setActiveTrade(null)}
           onConfirm={handleTradeConfirm}
+          message={tradeMessage}
         />
       ) : null}
     </main>

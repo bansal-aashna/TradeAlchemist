@@ -209,6 +209,7 @@ export const MarketWatch = memo(function MarketWatch({
                             onTradeAction({
                               ticker: stock.ticker,
                               company: stock.companyName,
+                              exchange: stock.exchange,
                               price: stock.currentPrice ?? 0,
                               type: "buy",
                             })
@@ -225,6 +226,7 @@ export const MarketWatch = memo(function MarketWatch({
                             onTradeAction({
                               ticker: stock.ticker,
                               company: stock.companyName,
+                              exchange: stock.exchange,
                               price: stock.currentPrice ?? 0,
                               type: "sell",
                               maxShares: availableShares,

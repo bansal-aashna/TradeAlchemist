@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from contextlib import asynccontextmanager
 from fastapi.responses import JSONResponse
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from db.mongo_client import (
@@ -214,9 +214,9 @@ def build_holdings_snapshot(uid: str, display_name: str):
 
     holdings.delete_many({"uid": uid})
     if holdings_docs:
-        holdings.insert_many(holdings_docs)
+        holdings.insert_many([doc.copy() for doc in holdings_docs])
 
-    return holdings_docs
+    return [{key: value for key, value in doc.items() if key != "_id"} for doc in holdings_docs]
 
 
 def sync_portfolio_snapshot(uid: str, display_name: str):
@@ -575,21 +575,24 @@ def get_metadata(symbol: str):
     return record
 
 class TradeRequest(BaseModel):
-    user_id: str
     symbol: str
     exchange: str
     quantity: int
 
 
 @app.post("/trade/buy")
-def buy_trade(req: TradeRequest):
-    trade = execute_trade(
-        req.user_id,
-        req.symbol,
-        req.exchange,
-        "BUY",
-        req.quantity
-    )
+def buy_trade(req: TradeRequest, current_user: dict = Depends(get_current_user)):
+    try:
+        trade = execute_trade(
+            current_user["uid"],
+            get_user_display_name(current_user),
+            req.symbol,
+            req.exchange,
+            "BUY",
+            req.quantity
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return JSONResponse(
         status_code=200,
         content={
@@ -600,14 +603,18 @@ def buy_trade(req: TradeRequest):
 
 
 @app.post("/trade/sell")
-def sell_trade(req: TradeRequest):
-    trade = execute_trade(
-        req.user_id,
-        req.symbol,
-        req.exchange,
-        "SELL",
-        req.quantity
-    )
+def sell_trade(req: TradeRequest, current_user: dict = Depends(get_current_user)):
+    try:
+        trade = execute_trade(
+            current_user["uid"],
+            get_user_display_name(current_user),
+            req.symbol,
+            req.exchange,
+            "SELL",
+            req.quantity
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return JSONResponse(
         status_code=200,
         content={

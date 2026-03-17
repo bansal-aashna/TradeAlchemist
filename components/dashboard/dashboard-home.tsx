@@ -234,6 +234,7 @@ export const DashboardHome = memo(function DashboardHome({
                   onTradeAction({
                     ticker: selectedStock.symbol,
                     company: selectedStock.companyName,
+                    exchange: selectedStock.exchange,
                     price: selectedStock.currentPrice,
                     type: "buy",
                   });
@@ -330,6 +331,7 @@ export const DashboardHome = memo(function DashboardHome({
                             onTradeAction({
                               ticker: stock.ticker,
                               company: stock.companyName,
+                              exchange: stock.exchange,
                               price: stock.currentPrice,
                               type: "buy",
                             });
