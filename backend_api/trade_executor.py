@@ -88,7 +88,7 @@ def execute_trade(user_id, display_name, symbol, exchange, side, quantity):
     positions = build_position_map(user_id)
     available_shares = positions.get((symbol, exchange), {}).get("quantity", 0)
     if available_shares == 0 and exchange:
-      available_shares = positions.get((symbol, ""), {}).get("quantity", 0)
+        available_shares = positions.get((symbol, ""), {}).get("quantity", 0)
 
     if side == "BUY":
         if gross_value > buying_power:
