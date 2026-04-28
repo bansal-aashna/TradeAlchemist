@@ -36,11 +36,20 @@ function formatChartDate(value: string | undefined) {
   return new Intl.DateTimeFormat("en-US", { day: "2-digit", month: "short", year: "numeric" }).format(date);
 }
 
-function formatAxisDate(value: string | undefined) {
+function formatAxisDate(value: string | undefined, range: RangeOption) {
   if (!value) return "--";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--";
-  return new Intl.DateTimeFormat("en-US", { year: "numeric" }).format(date);
+
+  if (range === "1D") {
+    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(date);
+  } else if (range === "5D" || range === "1M") {
+    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+  } else if (range === "6M" || range === "YTD" || range === "1Y") {
+    return new Intl.DateTimeFormat("en-US", { month: "short" }).format(date);
+  } else {
+    return new Intl.DateTimeFormat("en-US", { year: "numeric" }).format(date);
+  }
 }
 
 function getSeriesByRange(series: ApiOHLCPoint[], range: RangeOption) {
@@ -203,18 +212,25 @@ export const BuyPage = memo(function BuyPage({
     () => getSeriesByRange(historySeries, activeRange),
     [historySeries, activeRange],
   );
-  const latestHistoryPoint = historySeries[historySeries.length - 1];
+  const latestHistoryPoint = chartRangeSeries[chartRangeSeries.length - 1];
   const previousHistoryPoint =
-    historySeries.length > 1 ? historySeries[historySeries.length - 2] : undefined;
-  const chartValues = chartRangeSeries.map((point) => point.close);
-  const chartGeometry = toChartPath(chartValues, 940, 300);
-  const chartPath = chartGeometry.path;
+    chartRangeSeries.length > 1 ? chartRangeSeries[chartRangeSeries.length - 2] : undefined;
+  const { path: chartPath, min: chartMin, max: chartMax } = useMemo(() => {
+    const chartCloses = chartRangeSeries.map((point) => point.close);
+    return toChartPath(chartCloses, 940, 300);
+  }, [chartRangeSeries]);
+
+  const chartTail = chartRangeSeries[chartRangeSeries.length - 1]?.close ?? 0;
+  const chartHead = chartRangeSeries[0]?.close ?? 0;
+  const diff = chartTail - chartHead;
+  const tone = diff >= 0 ? "positive" : "negative";
+
   const activePoint =
     hoverIndex !== null && chartRangeSeries[hoverIndex]
       ? chartRangeSeries[hoverIndex]
       : chartRangeSeries[chartRangeSeries.length - 1];
   const chartDate = formatChartDate(activePoint?.date);
-  const chartTail = activePoint?.close;
+  const chartTailPrice = activePoint?.close;
   const hoverX =
     hoverIndex !== null && chartRangeSeries.length > 1
       ? (hoverIndex / (chartRangeSeries.length - 1)) * 940
@@ -222,29 +238,34 @@ export const BuyPage = memo(function BuyPage({
   const hoverY =
     hoverIndex !== null && activePoint
       ? 300 -
-      ((activePoint.close - chartGeometry.min) / Math.max(1, chartGeometry.max - chartGeometry.min)) *
+      ((activePoint.close - chartMin) / Math.max(1, chartMax - chartMin)) *
       300
       : null;
+  const prevCloseY =
+    selectedStock?.prevClose !== undefined && chartMax > chartMin
+      ? 300 - ((selectedStock.prevClose - chartMin) / (chartMax - chartMin)) * 300
+      : null;
+
   const hoverXPct = hoverX !== null ? (hoverX / 940) * 100 : null;
   const hoverYPct = hoverY !== null ? (hoverY / 300) * 100 : null;
-  const tooltipXPct = hoverXPct !== null ? Math.min(92, Math.max(8, hoverXPct + 2)) : 78;
-  const tooltipYPct = hoverYPct !== null ? Math.min(78, Math.max(8, hoverYPct - 10)) : 12;
+  const tooltipXPct = hoverXPct !== null ? Math.min(92, Math.max(8, hoverXPct + 2)) : null;
+  const tooltipYPct = hoverYPct !== null ? Math.min(78, Math.max(8, hoverYPct - 10)) : null;
 
   const yTicks = useMemo(() => {
-    if (chartValues.length === 0) return ["--", "--", "--", "--", "--"];
-    const min = chartGeometry.min;
-    const max = chartGeometry.max;
+    if (chartRangeSeries.length === 0) return ["--", "--", "--", "--", "--"];
+    const min = chartMin;
+    const max = chartMax;
     const step = (max - min) / 4;
     return Array.from({ length: 5 }, (_, index) => (max - step * index).toFixed(0));
-  }, [chartValues, chartGeometry.max, chartGeometry.min]);
+  }, [chartRangeSeries.length, chartMax, chartMin]);
 
   const xTicks = useMemo(() => {
     if (chartRangeSeries.length === 0) return ["--", "--", "--", "--", "--"];
     const idx = [0, 0.25, 0.5, 0.75, 1].map((factor) =>
       Math.min(chartRangeSeries.length - 1, Math.round((chartRangeSeries.length - 1) * factor)),
     );
-    return idx.map((i) => formatAxisDate(chartRangeSeries[i]?.date));
-  }, [chartRangeSeries]);
+    return idx.map((i) => formatAxisDate(chartRangeSeries[i]?.date, activeRange));
+  }, [chartRangeSeries, activeRange]);
 
   return (
     <section className="ta-dashboard-content ta-buy-page">
@@ -356,13 +377,15 @@ export const BuyPage = memo(function BuyPage({
                       </>
                     ) : null}
 
+                    {hoverIndex !== null && tooltipXPct !== null && tooltipYPct !== null ? (
                     <div className="ta-charts-tooltip" style={{ left: `${tooltipXPct}%`, top: `${tooltipYPct}%` }}>
-                      {formatCurrency(chartTail, stockCurrency)} {chartDate}
+                      {formatCurrency(chartTailPrice, stockCurrency)} {chartDate}
                     </div>
+                    ) : null}
 
                     <svg
                       viewBox="0 0 940 300"
-                      className="ta-buy-chart-svg"
+                      className="ta-charts-plot"
                       role="img"
                       aria-label={`${selectedStock.symbol} historical performance`}
                       onMouseMove={(event) => {
@@ -376,12 +399,21 @@ export const BuyPage = memo(function BuyPage({
                     >
                       <defs>
                         <linearGradient id="taBuyChartFill" x1="0" x2="0" y1="0" y2="1">
-                          <stop offset="0%" stopColor="rgba(22,163,74,0.40)" />
-                          <stop offset="100%" stopColor="rgba(22,163,74,0.05)" />
+                          <stop offset="0%" stopColor={diff >= 0 ? "rgba(26,115,232,0.12)" : "rgba(230,64,54,0.12)"} />
+                          <stop offset="100%" stopColor={diff >= 0 ? "rgba(26,115,232,0)" : "rgba(230,64,54,0)"} />
                         </linearGradient>
                       </defs>
+                      {prevCloseY !== null && !isNaN(prevCloseY) ? (
+                        <line
+                          x1="0" y1={prevCloseY}
+                          x2="940" y2={prevCloseY}
+                          stroke="var(--border-secondary)"
+                          strokeDasharray="4 4"
+                          strokeWidth="1.5"
+                        />
+                      ) : null}
                       <path d={`${chartPath} L940,300 L0,300 Z`} fill="url(#taBuyChartFill)" />
-                      <path d={chartPath} className="ta-buy-chart-line-path ta-charts-line" />
+                      <path d={chartPath} className={`ta-charts-line ${tone}`} />
                     </svg>
                     <div className="ta-charts-axis-y">
                       {yTicks.map((tick, index) => (
