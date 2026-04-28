@@ -99,7 +99,7 @@ def execute_trade(user_id, display_name, symbol, exchange, side, quantity):
             raise ValueError("Not enough shares available to sell")
         commission_rate = COMMISSION_RATE
         commission_amount = round(gross_value * COMMISSION_RATE, 2)
-        net_value = round(gross_value + commission_amount, 2)
+        net_value = round(gross_value - commission_amount, 2)
         buying_power = round(buying_power + net_value, 2)
     else:
         raise ValueError("Invalid trade side")
