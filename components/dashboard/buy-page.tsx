@@ -222,8 +222,8 @@ export const BuyPage = memo(function BuyPage({
   const hoverY =
     hoverIndex !== null && activePoint
       ? 300 -
-        ((activePoint.close - chartGeometry.min) / Math.max(1, chartGeometry.max - chartGeometry.min)) *
-          300
+      ((activePoint.close - chartGeometry.min) / Math.max(1, chartGeometry.max - chartGeometry.min)) *
+      300
       : null;
   const hoverXPct = hoverX !== null ? (hoverX / 940) * 100 : null;
   const hoverYPct = hoverY !== null ? (hoverY / 300) * 100 : null;
@@ -312,10 +312,9 @@ export const BuyPage = memo(function BuyPage({
               >
                 <div>
                   <p className="ta-watch-preview-symbol">{stock.symbol}</p>
-                  <p className="ta-watch-preview-name">
-                    {stock.companyName} ({stock.exchange})
-                  </p>
+                  <p className="ta-watch-preview-name">{stock.companyName}</p>
                 </div>
+                <span className="ta-watch-result-exchange">{stock.exchange}</span>
               </button>
             ))
           ) : searchError ? (
@@ -327,155 +326,155 @@ export const BuyPage = memo(function BuyPage({
       ) : null}
 
       {selectedStock ? (
-      <div className="ta-buy-layout-grid">
-        <article className="ta-buy-panel ta-buy-chart-panel">
-          <h3 className="ta-buy-panel-title">Historical Performance</h3>
-          <div className="ta-buy-chart-placeholder">
-            {selectedStock ? (
-              <div className="ta-buy-chart-live">
-                <div className="ta-charts-ranges">
-                  {rangeOptions.map((range) => (
-                    <button
-                      key={range}
-                      type="button"
-                      className={`ta-charts-range-btn ${activeRange === range ? "active" : ""}`}
-                      onClick={() => {
-                        setActiveRange(range);
-                        setHoverIndex(null);
+        <div className="ta-buy-layout-grid">
+          <article className="ta-buy-panel ta-buy-chart-panel">
+            <h3 className="ta-buy-panel-title">Historical Performance</h3>
+            <div className="ta-buy-chart-placeholder">
+              {selectedStock ? (
+                <div className="ta-buy-chart-live">
+                  <div className="ta-charts-ranges">
+                    {rangeOptions.map((range) => (
+                      <button
+                        key={range}
+                        type="button"
+                        className={`ta-charts-range-btn ${activeRange === range ? "active" : ""}`}
+                        onClick={() => {
+                          setActiveRange(range);
+                          setHoverIndex(null);
+                        }}
+                      >
+                        {range}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="ta-charts-plot-wrap">
+                    {hoverX !== null && hoverY !== null ? (
+                      <>
+                        <div className="ta-charts-crosshair ta-charts-crosshair-v" style={{ left: `${hoverXPct}%` }} />
+                        <div className="ta-charts-crosshair ta-charts-crosshair-h" style={{ top: `${hoverYPct}%` }} />
+                      </>
+                    ) : null}
+
+                    <div className="ta-charts-tooltip" style={{ left: `${tooltipXPct}%`, top: `${tooltipYPct}%` }}>
+                      {formatCurrency(chartTail, stockCurrency)} {chartDate}
+                    </div>
+
+                    <svg
+                      viewBox="0 0 940 300"
+                      className="ta-buy-chart-svg"
+                      role="img"
+                      aria-label={`${selectedStock.symbol} historical performance`}
+                      onMouseMove={(event) => {
+                        if (chartRangeSeries.length < 2) return;
+                        const bounds = event.currentTarget.getBoundingClientRect();
+                        const x = event.clientX - bounds.left;
+                        const ratio = Math.max(0, Math.min(1, x / bounds.width));
+                        setHoverIndex(Math.round(ratio * (chartRangeSeries.length - 1)));
                       }}
+                      onMouseLeave={() => setHoverIndex(null)}
                     >
-                      {range}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="ta-charts-plot-wrap">
-                  {hoverX !== null && hoverY !== null ? (
-                    <>
-                      <div className="ta-charts-crosshair ta-charts-crosshair-v" style={{ left: `${hoverXPct}%` }} />
-                      <div className="ta-charts-crosshair ta-charts-crosshair-h" style={{ top: `${hoverYPct}%` }} />
-                    </>
-                  ) : null}
-
-                  <div className="ta-charts-tooltip" style={{ left: `${tooltipXPct}%`, top: `${tooltipYPct}%` }}>
-                    {formatCurrency(chartTail, stockCurrency)} {chartDate}
-                  </div>
-
-                  <svg
-                    viewBox="0 0 940 300"
-                    className="ta-buy-chart-svg"
-                    role="img"
-                    aria-label={`${selectedStock.symbol} historical performance`}
-                    onMouseMove={(event) => {
-                      if (chartRangeSeries.length < 2) return;
-                      const bounds = event.currentTarget.getBoundingClientRect();
-                      const x = event.clientX - bounds.left;
-                      const ratio = Math.max(0, Math.min(1, x / bounds.width));
-                      setHoverIndex(Math.round(ratio * (chartRangeSeries.length - 1)));
-                    }}
-                    onMouseLeave={() => setHoverIndex(null)}
-                  >
-                    <defs>
-                      <linearGradient id="taBuyChartFill" x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="0%" stopColor="rgba(22,163,74,0.40)" />
-                        <stop offset="100%" stopColor="rgba(22,163,74,0.05)" />
-                      </linearGradient>
-                    </defs>
-                    <path d={`${chartPath} L940,300 L0,300 Z`} fill="url(#taBuyChartFill)" />
-                    <path d={chartPath} className="ta-buy-chart-line-path ta-charts-line" />
-                  </svg>
-                  <div className="ta-charts-axis-y">
-                    {yTicks.map((tick, index) => (
-                      <span key={`${tick}-${index}`}>{tick}</span>
-                    ))}
-                  </div>
-                  <div className="ta-charts-axis-x">
-                    {xTicks.map((tick, index) => (
-                      <span key={`${tick}-${index}`}>{tick}</span>
-                    ))}
+                      <defs>
+                        <linearGradient id="taBuyChartFill" x1="0" x2="0" y1="0" y2="1">
+                          <stop offset="0%" stopColor="rgba(22,163,74,0.40)" />
+                          <stop offset="100%" stopColor="rgba(22,163,74,0.05)" />
+                        </linearGradient>
+                      </defs>
+                      <path d={`${chartPath} L940,300 L0,300 Z`} fill="url(#taBuyChartFill)" />
+                      <path d={chartPath} className="ta-buy-chart-line-path ta-charts-line" />
+                    </svg>
+                    <div className="ta-charts-axis-y">
+                      {yTicks.map((tick, index) => (
+                        <span key={`${tick}-${index}`}>{tick}</span>
+                      ))}
+                    </div>
+                    <div className="ta-charts-axis-x">
+                      {xTicks.map((tick, index) => (
+                        <span key={`${tick}-${index}`}>{tick}</span>
+                      ))}
+                    </div>
                   </div>
                 </div>
+              ) : (
+                <div className="ta-buy-chart-line" />
+              )}
+            </div>
+          </article>
+
+          <div className="ta-buy-side-column">
+            <article className="ta-buy-panel ta-buy-actions-panel">
+              <div className="ta-buy-actions-row">
+                <button
+                  type="button"
+                  className="ta-buy-action-btn ta-trade-pill buy"
+                  disabled={!selectedStock}
+                  onClick={() => {
+                    if (!selectedStock?.currentPrice) return;
+                    onTradeAction({
+                      ticker: selectedStock.symbol,
+                      company: selectedStock.companyName,
+                      exchange: selectedStock.exchange,
+                      price: selectedStock.currentPrice,
+                      type: "buy",
+                    });
+                  }}
+                >
+                  Buy
+                </button>
+                <button
+                  type="button"
+                  className="ta-buy-action-btn ta-trade-pill sell"
+                  disabled={!canSell}
+                  onClick={() => {
+                    if (!selectedStock?.currentPrice) return;
+                    onTradeAction({
+                      ticker: selectedStock.symbol,
+                      company: selectedStock.companyName,
+                      exchange: selectedStock.exchange,
+                      price: selectedStock.currentPrice,
+                      type: "sell",
+                      maxShares: availableSellShares,
+                    });
+                  }}
+                >
+                  Sell
+                </button>
               </div>
-            ) : (
-              <div className="ta-buy-chart-line" />
-            )}
+            </article>
+
+            <article className="ta-buy-panel ta-buy-stats-panel">
+              <h3 className="ta-buy-panel-title">Key Statistics</h3>
+              <div className="ta-buy-stats-grid">
+                <p>Open</p>
+                <p>{formatCurrency(latestHistoryPoint?.open, stockCurrency)}</p>
+                <p>High</p>
+                <p>{formatCurrency(latestHistoryPoint?.high, stockCurrency)}</p>
+                <p>Low</p>
+                <p>{formatCurrency(latestHistoryPoint?.low, stockCurrency)}</p>
+                <p>Close</p>
+                <p>{formatCurrency(latestHistoryPoint?.close, stockCurrency)}</p>
+                <p>Previous Close</p>
+                <p>{formatCurrency(previousHistoryPoint?.close ?? selectedStock?.prevClose, stockCurrency)}</p>
+                <p>Volume</p>
+                <p>
+                  {latestHistoryPoint?.volume
+                    ? new Intl.NumberFormat("en-US").format(latestHistoryPoint.volume)
+                    : "--"}
+                </p>
+                <p>Avg Volatility</p>
+                <p>{selectedStock?.avgVolatility?.toFixed(2) ?? "--"}</p>
+                <p>52-Week High</p>
+                <p>{formatCurrency(selectedStock?.fiftyTwoWeekHigh, stockCurrency)}</p>
+                <p>52-Week Low</p>
+                <p>{formatCurrency(selectedStock?.fiftyTwoWeekLow, stockCurrency)}</p>
+                <p>Sector</p>
+                <p>{selectedStock?.sector ?? "--"}</p>
+                <p>Industry</p>
+                <p>{selectedStock?.industry ?? "--"}</p>
+              </div>
+            </article>
           </div>
-        </article>
-
-        <div className="ta-buy-side-column">
-          <article className="ta-buy-panel ta-buy-actions-panel">
-            <div className="ta-buy-actions-row">
-              <button
-                type="button"
-                className="ta-buy-action-btn ta-trade-pill buy"
-                disabled={!selectedStock}
-                onClick={() => {
-                  if (!selectedStock?.currentPrice) return;
-                  onTradeAction({
-                    ticker: selectedStock.symbol,
-                    company: selectedStock.companyName,
-                    exchange: selectedStock.exchange,
-                    price: selectedStock.currentPrice,
-                    type: "buy",
-                  });
-                }}
-              >
-                Buy
-              </button>
-              <button
-                type="button"
-                className="ta-buy-action-btn ta-trade-pill sell"
-                disabled={!canSell}
-                onClick={() => {
-                  if (!selectedStock?.currentPrice) return;
-                  onTradeAction({
-                    ticker: selectedStock.symbol,
-                    company: selectedStock.companyName,
-                    exchange: selectedStock.exchange,
-                    price: selectedStock.currentPrice,
-                    type: "sell",
-                    maxShares: availableSellShares,
-                  });
-                }}
-              >
-                Sell
-              </button>
-            </div>
-          </article>
-
-          <article className="ta-buy-panel ta-buy-stats-panel">
-            <h3 className="ta-buy-panel-title">Key Statistics</h3>
-            <div className="ta-buy-stats-grid">
-              <p>Open</p>
-              <p>{formatCurrency(latestHistoryPoint?.open, stockCurrency)}</p>
-              <p>High</p>
-              <p>{formatCurrency(latestHistoryPoint?.high, stockCurrency)}</p>
-              <p>Low</p>
-              <p>{formatCurrency(latestHistoryPoint?.low, stockCurrency)}</p>
-              <p>Close</p>
-              <p>{formatCurrency(latestHistoryPoint?.close, stockCurrency)}</p>
-              <p>Previous Close</p>
-              <p>{formatCurrency(previousHistoryPoint?.close ?? selectedStock?.prevClose, stockCurrency)}</p>
-              <p>Volume</p>
-              <p>
-                {latestHistoryPoint?.volume
-                  ? new Intl.NumberFormat("en-US").format(latestHistoryPoint.volume)
-                  : "--"}
-              </p>
-              <p>Avg Volatility</p>
-              <p>{selectedStock?.avgVolatility?.toFixed(2) ?? "--"}</p>
-              <p>52-Week High</p>
-              <p>{formatCurrency(selectedStock?.fiftyTwoWeekHigh, stockCurrency)}</p>
-              <p>52-Week Low</p>
-              <p>{formatCurrency(selectedStock?.fiftyTwoWeekLow, stockCurrency)}</p>
-              <p>Sector</p>
-              <p>{selectedStock?.sector ?? "--"}</p>
-              <p>Industry</p>
-              <p>{selectedStock?.industry ?? "--"}</p>
-            </div>
-          </article>
         </div>
-      </div>
       ) : null}
 
     </section>

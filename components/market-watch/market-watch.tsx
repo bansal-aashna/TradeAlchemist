@@ -126,23 +126,24 @@ export const MarketWatch = memo(function MarketWatch({
                 <article key={`${stock.exchange}-${stock.symbol}`} className="ta-watch-result-item">
                   <div>
                     <p className="ta-watch-preview-symbol">{stock.symbol}</p>
-                    <p className="ta-watch-preview-name">
-                      {stock.companyName} ({stock.exchange})
-                    </p>
+                    <p className="ta-watch-preview-name">{stock.companyName}</p>
                   </div>
-                  <button
-                    type="button"
-                    className="ta-watch-add-btn"
-                    onClick={() =>
-                      onAddWatchlist({
-                        ticker: stock.symbol,
-                        companyName: stock.companyName,
-                        exchange: stock.exchange,
-                      })
-                    }
-                  >
-                    +
-                  </button>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
+                    <span className="ta-watch-result-exchange">{stock.exchange}</span>
+                    <button
+                      type="button"
+                      className="ta-watch-add-btn"
+                      onClick={() =>
+                        onAddWatchlist({
+                          ticker: stock.symbol,
+                          companyName: stock.companyName,
+                          exchange: stock.exchange,
+                        })
+                      }
+                    >
+                      +
+                    </button>
+                  </div>
                 </article>
               ))
             ) : searchError ? (

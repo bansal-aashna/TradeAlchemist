@@ -33,17 +33,22 @@
   --bg-secondary: #000000;
   --bg-tertiary: #111319;
   --bg-elevated: #05070c;
-  --bg-content: #1b1d22; /* Content panels on dashboard pages */
-  --bg-topbar: #000000; /* Dashboard top navigation background */
-  --bg-strip: #000000; /* Fixed portfolio strip background */
+  --bg-content: #1b1d22;
+  /* Content panels on dashboard pages */
+  --bg-topbar: #000000;
+  /* Dashboard top navigation background */
+  --bg-strip: #000000;
+  /* Fixed portfolio strip background */
 
   /* Text tokens used for headers, labels, muted hints, topbar and strip. */
   --text-primary: #f4f8ff;
   --text-secondary: #d8e6fb;
   --text-muted: #656970;
   --text-disabled: #667083;
-  --text-topbar: #f4f8ff; /* Topbar menu and brand text */
-  --text-strip: #f4f8ff; /* Bottom strip text */
+  --text-topbar: #f4f8ff;
+  /* Topbar menu and brand text */
+  --text-strip: #f4f8ff;
+  /* Bottom strip text */
 
   /* Border tokens used on cards, form fields, table cells, strip separators. */
   --border-primary: #2d3544;
@@ -109,7 +114,8 @@
   --transition-slow: 0.2s ease;
 
   /* Layout constants (used to reserve bottom space for fixed strip). */
-  --ta-strip-height: 60px; /* Height of bottom portfolio summary strip */
+  --ta-strip-height: 60px;
+  /* Height of bottom portfolio summary strip */
 }
 
 /* ===== LIGHT MODE VARIABLES ===== */
@@ -121,21 +127,23 @@ html[data-theme="light"] {
   --bg-elevated: #ffffff;
   --bg-content: #f5f7fa;
   --bg-topbar: #ffffff;
-  --bg-strip: #ffffff;         /* Light mode strip background */
-  
+  --bg-strip: #ffffff;
+  /* Light mode strip background */
+
   --text-primary: #141414;
   --text-secondary: #383838;
   --text-muted: #667083;
   --text-disabled: #9aa4b6;
   --text-topbar: #141414;
-  --text-strip: #141414;        /* Light mode strip text */
-  
+  --text-strip: #141414;
+  /* Light mode strip text */
+
   --border-primary: #636466;
   --border-secondary: #7e828c;
   --border-muted: #eef0f2;
   --border-light: rgba(0, 0, 0, 0.12);
   --border-strip: rgba(127, 127, 127, 0.3);
-  
+
   --icon-primary: #667083;
   --icon-secondary: #ebedef;
 }
@@ -148,18 +156,18 @@ html[data-theme="light"] {
   --bg-elevated: #ffffff;
   --bg-content: #f5f7fa;
   --bg-topbar: #ffffff;
-  
+
   --text-primary: #141414;
   --text-secondary: #383838;
   --text-muted: #667083;
   --text-disabled: #9aa4b6;
   --text-topbar: #141414;
-  
+
   --border-primary: #636466;
   --border-secondary: #7e828c;
   --border-muted: #eef0f2;
   --border-light: rgba(0, 0, 0, 0.12);
-  
+
   --icon-primary: #667083;
   --icon-secondary: #ebedef;
 }
@@ -677,6 +685,7 @@ select:focus-visible {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -1025,10 +1034,12 @@ select:focus-visible {
 
 .ta-dashboard-inner {
   width: 100%;
-  max-width: 1200px;   /* Controls overall width */
+  max-width: 1200px;
+  /* Controls overall width */
   display: flex;
   flex-direction: column;
-  gap: var(--space-xl);  /* Controls spacing between sections */
+  gap: var(--space-xl);
+  /* Controls spacing between sections */
 }
 
 /* ===== ICONS - UNIFIED STYLING ===== */
@@ -1047,7 +1058,7 @@ select:focus-visible {
   display: grid;
   gap: 0.08rem;
   align-content: start;
-  
+
 }
 
 .ta-buy-title {
@@ -1234,7 +1245,8 @@ select:focus-visible {
 .ta-buy-chart-placeholder {
   width: 100%;
   flex: 1;
-  min-height: 320px; /* Ensure minimum height */
+  min-height: 320px;
+  /* Ensure minimum height */
   position: relative;
 }
 
@@ -1288,12 +1300,12 @@ select:focus-visible {
     height: 220px;
     min-height: 0;
   }
-  
+
   .ta-charts-axis-y {
     width: 45px;
     font-size: 0.72rem;
   }
-  
+
   .ta-charts-axis-x {
     margin-left: 50px;
     width: calc(100% - 50px);
@@ -1325,54 +1337,115 @@ select:focus-visible {
   cursor: pointer;
 }
 
-.ta-buy-action-btn.buy {
-  background: var(--accent-secondary);
-  color: #f1fff5;
-}
+/* =============================================================
+   UNIFIED PILL SYSTEM
+   All Buy/Sell buttons across every page use these tokens.
+   Shape, color, and interactions are defined once here.
+   Size is controlled by modifier classes (.pill--sm / .pill--lg)
+   or by the context-specific wrappers below.
+   ============================================================= */
 
-.ta-buy-action-btn.sell {
-  background: var(--danger-bg);
-  color: #fff0f0;
-}
-
+/* ---------- shared base ---------- */
 .ta-trade-pill,
-.ta-type-pill {
+.ta-type-pill,
+.ta-trade-submit-btn,
+.ta-buy-action-btn {
+  /* shape */
   border: 0;
   border-radius: var(--radius-full);
-  padding: var(--space-xs) var(--space-sm);
-  font-size: var(--text-sm);
+  /* default size (action buttons in buy-page side panel) */
+  padding: 0.48rem 1.1rem;
+  min-height: 38px;
+  min-width: 64px;
+  /* text */
+  font-size: 0.82rem;
   font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  /* layout */
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 30px;
+  white-space: nowrap;
+  /* interaction */
   cursor: pointer;
-  letter-spacing: 0.02em;
+  transition:
+    filter        120ms ease,
+    transform     120ms ease,
+    opacity       120ms ease;
 }
 
-.ta-trade-pill.buy {
+/* hover / active */
+.ta-trade-pill:hover:not(:disabled),
+.ta-type-pill:hover:not(:disabled),
+.ta-trade-submit-btn:hover:not(:disabled),
+.ta-buy-action-btn:hover:not(:disabled) {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+}
+
+.ta-trade-pill:active:not(:disabled),
+.ta-type-pill:active:not(:disabled),
+.ta-trade-submit-btn:active:not(:disabled),
+.ta-buy-action-btn:active:not(:disabled) {
+  filter: brightness(0.95);
+  transform: translateY(0);
+}
+
+/* disabled */
+.ta-trade-pill:disabled,
+.ta-type-pill:disabled,
+.ta-trade-submit-btn:disabled,
+.ta-buy-action-btn:disabled,
+.ta-sell-pill-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+
+/* ---------- color variants ---------- */
+.ta-trade-pill.buy,
+.ta-type-pill.buy,
+.ta-trade-submit-btn.buy,
+.ta-buy-action-btn.buy {
   background: var(--accent-secondary);
-  color: #e9ffef;
+  color: #e8fff2;
+  box-shadow: 0 2px 10px rgba(22,199,132,0.22);
 }
 
-.ta-trade-pill.sell {
+.ta-trade-pill.sell,
+.ta-type-pill.sell,
+.ta-trade-submit-btn.sell,
+.ta-buy-action-btn.sell {
   background: var(--danger-bg);
   color: #ffecee;
+  box-shadow: 0 2px 10px rgba(200,35,51,0.20);
 }
 
-.ta-buy-stats-grid {
-  margin-top: 0.6rem;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.4rem 0.7rem;
+/* ---------- SM — compact table / badge variant ----------
+   Used in: market-watch table, holdings table, watchlist
+   transaction-history badges (display-only span)
+*/
+.ta-type-pill-btn,   /* clickable table pill */
+.ta-type-pill:not(button) /* display-only badge span */ {
+  padding: 0.22rem 0.65rem;
+  min-height: 26px;
+  min-width: 48px;
+  font-size: 0.7rem;
+  border-radius: var(--radius-full);
 }
 
-.ta-buy-stats-grid p:nth-child(odd) {
-  color: var(--text-muted);
+/* make sure clickable table pills get cursor */
+.ta-type-pill-btn {
+  cursor: pointer;
 }
 
-.ta-buy-stats-grid p:nth-child(even) {
-  font-weight: 600;
+/* ---------- LG — modal confirm button ---------- */
+.ta-trade-submit-btn {
+  padding: 0.55rem 1.5rem;
+  min-height: 44px;
+  font-size: 0.85rem;
 }
 
 /* ===== MARKET WATCH ===== */
@@ -1475,11 +1548,11 @@ select:focus-visible {
 }
 
 .ta-watch-result-item {
-  padding: var(--space-sm) var(--space-md);
+  padding: 0.5rem 0.8rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-md);
+  gap: 0.6rem;
   border-bottom: var(--border-thin) solid var(--border-muted);
 }
 
@@ -1489,6 +1562,7 @@ button.ta-watch-result-item {
   background: transparent;
   text-align: left;
   cursor: pointer;
+  color: var(--text-primary);
 }
 
 .ta-watch-result-item:last-child {
@@ -1497,6 +1571,32 @@ button.ta-watch-result-item {
 
 .ta-watch-result-item:hover {
   background: var(--border-light);
+}
+
+.ta-watch-preview-symbol {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ta-watch-preview-name {
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* Exchange badge shown on the right of each result row */
+.ta-watch-result-exchange {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: var(--border-light);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .ta-watch-preview-row {
@@ -1729,39 +1829,7 @@ button.ta-watch-result-item {
   color: var(--danger-primary);
 }
 
-.ta-table-action.ta-trade-pill {
-  border: 0;
-}
-
-.ta-table-action.ta-trade-pill.buy {
-  background: var(--accent-secondary);
-  color: #e9ffef;
-}
-
-.ta-table-action.ta-trade-pill.sell {
-  background: var(--danger-bg);
-  color: #ffecee;
-}
-
-.ta-type-pill.buy {
-  color: #e9ffef;
-  background: var(--accent-secondary);
-}
-
-.ta-type-pill.sell {
-  color: #ffecee;
-  background: var(--danger-primary);
-}
-
-.ta-type-pill-btn {
-  border: 0;
-  cursor: pointer;
-}
-
-.ta-type-pill-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+/* .ta-table-action.ta-trade-pill — inherits from unified pill above, no overrides needed */
 
 /* ===== ICON BUTTONS ===== */
 .ta-icon-btn {
@@ -1823,20 +1891,20 @@ button.ta-watch-result-item {
     --bg-content: #f5f7fa;
     --bg-topbar: #ffffff;
     --bg-strip: #ffffff;
-    
+
     --text-primary: #141414;
     --text-secondary: #383838;
     --text-muted: #667083;
     --text-disabled: #9aa4b6;
     --text-topbar: #141414;
     --text-strip: #141414;
-    
+
     --border-primary: #636466;
     --border-secondary: #7e828c;
     --border-muted: #eef0f2;
     --border-light: rgba(0, 0, 0, 0.12);
     --border-strip: rgba(127, 127, 127, 0.3);
-    
+
     --icon-primary: #667083;
     --icon-secondary: #ebedef;
   }
@@ -2126,35 +2194,7 @@ button.ta-watch-result-item {
   font-size: var(--text-8xl);
 }
 
-.ta-trade-submit-btn {
-  border: 0;
-  color: #fff;
-  cursor: pointer;
-}
-
-.ta-trade-submit-btn.buy {
-  background: var(--accent-secondary);
-}
-
-.ta-trade-submit-btn.sell {
-  background: var(--danger-bg);
-}
-
-.ta-trade-submit-btn:disabled,
-.ta-buy-action-btn:disabled,
-.ta-trade-pill:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.ta-sell-pill-btn {
-  min-width: 72px;
-}
-
-.ta-sell-pill-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+/* .ta-trade-submit-btn / .ta-sell-pill-btn — all handled by unified pill system above */
 
 .ta-auth-page {
   background: #000000 !important;
