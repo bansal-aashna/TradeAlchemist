@@ -74,7 +74,7 @@ export const MarketWatch = memo(function MarketWatch({
 
         <h2 className="ta-watch-main-title">Market Watch</h2>
 
-        <div className="ta-watch-search-card">
+        <div className="ta-buy-search-card">
           <div className="ta-buy-search-row">
             <div className="ta-buy-select-wrap">
               <select
@@ -93,24 +93,22 @@ export const MarketWatch = memo(function MarketWatch({
               </select>
               <span className="ta-buy-select-arrow">▾</span>
             </div>
-            <div className="ta-watch-search-input-wrap">
-              <span className="ta-watch-search-icon">⌕</span>
-
+            <div className="ta-buy-search-input-wrap">
+              <span className="ta-buy-search-icon">⌕</span>
               <input
-                className="ta-watch-search-input"
+                className="ta-buy-search-input"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Ticker to watch..."
               />
-
               {query ? (
                 <button
                   type="button"
-                  className="ta-watch-search-clear"
+                  className="ta-buy-search-clear"
                   onClick={() => setQuery("")}
                   aria-label="Clear search"
                 >
-                  x
+                  ✕
                 </button>
               ) : null}
             </div>

@@ -53,6 +53,8 @@
   /* Border tokens used on cards, form fields, table cells, strip separators. */
   --border-primary: #2d3544;
   --border-secondary: #7e828c;
+  /* Unified search bar border — very dark grey, used on all search inputs & selects */
+  --search-border: #2a2d35;
   --border-muted: rgba(127, 127, 127, 0.2);
   --border-light: rgba(127, 127, 127, 0.3);
   --border-strip: rgba(127, 127, 127, 0.3);
@@ -1070,88 +1072,57 @@ select:focus-visible {
   color: var(--text-muted);
 }
 
-.ta-buy-search-card {
-  border: var(--border-thin) solid var(--border-light);
-  border-radius: var(--radius-2xl);
+/* ===== SEARCH BAR — unified across Buy, Charts, Market Watch ===== */
+
+/* Outer container card (wraps the row of select + input) */
+.ta-buy-search-card,
+.ta-watch-search-card {
+  border: 1px solid var(--search-border);
+  border-radius: var(--radius-xl);
   background: var(--bg-tertiary);
-  padding: 0.55rem;
+  padding: 0.45rem;
 }
 
+/* Row layout: exchange select | search input */
 .ta-buy-search-row {
   display: grid;
-  gap: var(--space-sm);
-  grid-template-columns: 340px 1fr;
+  gap: 0.5rem;
+  grid-template-columns: 220px 1fr;
   width: 100%;
 }
 
-.ta-buy-search-input-wrap {
-  border: var(--border-normal) solid var(--border-secondary);
-  border-radius: var(--radius-xl);
-  background: var(--bg-elevated);
-  display: flex;
-  align-items: center;
-  padding: 0 0.95rem;
-  gap: 0.7rem;
-  height: 46px;
-}
-
-.ta-buy-search-input-wrap:focus-within {
-  border-color: var(--border-secondary);
-}
-
-.ta-buy-search-input {
-  border: 0;
-  background: transparent;
-  outline: none;
-  box-shadow: none;
-  font-size: var(--text-base);
-  width: 100%;
-  color: var(--text-primary);
-  caret-color: var(--text-primary);
-  accent-color: var(--text-primary);
-}
-
-.ta-buy-search-input:focus,
-.ta-buy-search-input:focus-visible {
-  outline: none;
-  box-shadow: none;
-}
-
-.ta-buy-search-clear {
-  border: 0;
-  background: transparent;
-  color: var(--icon-secondary);
-  cursor: pointer;
-  padding: var(--space-xs) var(--space-xs);
-  font-size: var(--text-md);
-}
-
+/* Exchange dropdown wrapper — same width as the select itself */
 .ta-buy-select-wrap {
   position: relative;
-  width: 340px;
+  width: 220px;
 }
 
+/* Exchange dropdown */
 .ta-buy-select {
-  width: 340px;
-  height: 46px;
+  width: 220px;
+  height: 44px;
   border-radius: var(--radius-xl);
-  border: var(--border-normal) solid var(--border-secondary);
-  padding: 0 34px 0 0.95rem;
+  border: 1px solid var(--search-border);
+  padding: 0 32px 0 0.85rem;
   font-size: var(--text-base);
   font-weight: 600;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
   cursor: pointer;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 92%, #141922 8%), var(--bg-primary));
+  background: var(--bg-elevated);
   color: var(--text-primary);
   color-scheme: dark;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: border-color var(--transition-fast);
+}
+
+.ta-buy-select:hover {
+  border-color: #3e424f;
 }
 
 .ta-buy-select:focus {
   outline: none;
-  border-color: var(--icon-secondary);
+  border-color: #4a4f5e;
 }
 
 .ta-buy-select option {
@@ -1161,12 +1132,88 @@ select:focus-visible {
 
 .ta-buy-select-arrow {
   position: absolute;
-  right: 13px;
+  right: 11px;
   top: 50%;
   transform: translateY(-50%);
   font-size: var(--text-base);
   pointer-events: none;
   color: var(--icon-primary);
+}
+
+/* Search input wrapper — text field area */
+.ta-buy-search-input-wrap,
+.ta-watch-search-input-wrap {
+  border: 1px solid var(--search-border);
+  border-radius: var(--radius-xl);
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  padding: 0 0.85rem;
+  gap: 0.6rem;
+  height: 44px;
+  transition: border-color var(--transition-fast);
+}
+
+.ta-buy-search-input-wrap:hover,
+.ta-watch-search-input-wrap:hover {
+  border-color: #3e424f;
+}
+
+.ta-buy-search-input-wrap:focus-within,
+.ta-watch-search-input-wrap:focus-within {
+  border-color: #4a4f5e;
+}
+
+/* Text input inside the wrapper */
+.ta-buy-search-input,
+.ta-watch-search-input {
+  border: 0;
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+  font-size: var(--text-base);
+  width: 100%;
+  color: var(--text-primary);
+  caret-color: var(--text-primary);
+  accent-color: var(--text-primary);
+  padding: 0;
+}
+
+.ta-buy-search-input::placeholder,
+.ta-watch-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.ta-buy-search-input:focus,
+.ta-buy-search-input:focus-visible,
+.ta-watch-search-input:focus,
+.ta-watch-search-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Clear (×) button */
+.ta-buy-search-clear,
+.ta-watch-search-clear {
+  border: 0;
+  background: transparent;
+  color: var(--icon-secondary);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: var(--text-md);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Search icon */
+.ta-buy-search-icon,
+.ta-watch-search-icon {
+  color: var(--icon-primary);
+  font-size: var(--text-9xl);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .ta-buy-selected-card {
@@ -1494,50 +1541,20 @@ select:focus-visible {
   font-size: var(--text-6xl);
 }
 
-.ta-watch-search-card {
-  border: var(--border-thin) solid var(--border-primary);
-  border-radius: var(--radius-lg);
-  background: var(--bg-secondary);
-  padding: 0.7rem;
-}
+/* ta-watch-search-card reuses .ta-buy-search-card styles above (same class applied) */
+/* ta-watch-search-input-wrap reuses .ta-buy-search-input-wrap styles above */
+/* ta-watch-search-input reuses .ta-buy-search-input styles above */
+/* ta-watch-search-clear reuses .ta-buy-search-clear styles above */
 
+/* Market-watch also has its own old panel (unused in new layout) */
 .ta-watch-search-panel {
   margin-top: var(--space-sm);
-  border: var(--border-thin) solid var(--border-muted);
-  border-radius: var(--radius-lg);
+  border: 1px solid var(--search-border);
+  border-radius: var(--radius-xl);
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: var(--space-md);
   padding: var(--space-md);
-}
-
-.ta-watch-search-input-wrap {
-  border: var(--border-thin) solid var(--border-muted);
-  border-radius: var(--radius-md);
-  background: var(--bg-primary);
-  display: flex;
-  align-items: center;
-  padding: 0 var(--space-sm);
-  gap: var(--space-sm);
-}
-
-.ta-watch-search-input {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: var(--text-primary);
-  outline: none;
-  font-size: var(--text-3xl);
-  padding: var(--space-sm) 0;
-}
-
-.ta-watch-search-clear {
-  border: 0;
-  background: transparent;
-  color: var(--icon-secondary);
-  cursor: pointer;
-  padding: var(--space-xs) var(--space-xs);
-  font-size: var(--text-3xl);
 }
 
 .ta-watch-search-results {
