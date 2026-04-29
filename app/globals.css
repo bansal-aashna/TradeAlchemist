@@ -1259,7 +1259,7 @@ select:focus-visible {
   gap: 0.8rem;
   grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
   min-height: 0;
-  align-items: start;
+  align-items: stretch;
 }
 
 @media (max-width: 1100px) {
@@ -1440,7 +1440,7 @@ select:focus-visible {
 
 .ta-buy-stats-panel {
   overflow-y: auto;
-  max-height: calc(100vh - 350px);
+  min-height: 0;
 }
 
 /* =============================================================
