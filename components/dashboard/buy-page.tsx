@@ -163,10 +163,8 @@ export const BuyPage = memo(function BuyPage({
     }
 
     void loadHistory();
-    const interval = window.setInterval(loadHistory, 30000);
     return () => {
       active = false;
-      window.clearInterval(interval);
     };
   }, [selectedStock?.symbol, activeRange, priceRefreshVersion]);
 
@@ -191,10 +189,9 @@ export const BuyPage = memo(function BuyPage({
       }
     };
 
-    const interval = window.setInterval(refreshSelectedStock, 30000);
+    void refreshSelectedStock();
     return () => {
       active = false;
-      window.clearInterval(interval);
     };
   }, [selectedExchange, selectedSymbol, priceRefreshVersion]);
 
@@ -223,6 +220,7 @@ export const BuyPage = memo(function BuyPage({
   const chartTail = chartRangeSeries[chartRangeSeries.length - 1]?.close ?? 0;
   const chartHead = chartRangeSeries[0]?.close ?? 0;
   const diff = chartTail - chartHead;
+  const diffPct = chartHead !== 0 ? (diff / chartHead) * 100 : 0;
   const tone = diff >= 0 ? "positive" : "negative";
 
   const activePoint =
@@ -350,6 +348,18 @@ export const BuyPage = memo(function BuyPage({
         <div className="ta-buy-layout-grid">
           <article className="ta-buy-panel ta-buy-chart-panel">
             <h3 className="ta-buy-panel-title">Historical Performance</h3>
+            <p className="ta-charts-stock-name" style={{ marginTop: '0.75rem' }}>
+              {selectedStock.symbol} - {selectedStock.companyName}
+            </p>
+            <p className="ta-charts-price">
+              {formatCurrency(latestHistoryPoint?.close, stockCurrency)}{" "}
+              <span>{stockCurrency}</span>
+            </p>
+            <p className={`ta-charts-change ${tone}`}>
+              {diff >= 0 ? "+" : ""}
+              {diff.toFixed(2)} ({diffPct.toFixed(2)}%) {diff >= 0 ? "▲" : "▼"} past{" "}
+              {activeRange === "5Y" ? "5 years" : activeRange}
+            </p>
             <div className="ta-buy-chart-placeholder">
               {selectedStock ? (
                 <div className="ta-buy-chart-live">

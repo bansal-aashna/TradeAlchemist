@@ -445,27 +445,26 @@ export default function DashboardPage() {
     };
   }, [router]);
 
-  useEffect(() => {
-    let isMounted = true;
-    const refreshIfMounted = async () => {
-      try {
-        await refreshLiveAccountData();
-      } catch {
-        // Keep the current screen stable; backend health polling shows connection status.
-      }
-    };
+  // Removed default 30s background polling. Now relies entirely on manual Refresh or Auto Ticker.
 
+  // BUG FIX: When "Start Auto" is on, aggressively poll for new prices so the UI actually moves
+  useEffect(() => {
+    if (!isAutoTickerEnabled) return;
+
+    let isMounted = true;
     const interval = window.setInterval(() => {
-      if (isMounted) {
-        void refreshIfMounted();
-      }
-    }, 30000);
+      if (!isMounted) return;
+      // Force charts & buy page to re-fetch their data
+      setPriceRefreshVersion((v) => v + 1);
+      // Refresh portfolio holdings value
+      void refreshLiveAccountData();
+    }, 30000); // 30 seconds to refresh UI when auto is on
 
     return () => {
       isMounted = false;
       window.clearInterval(interval);
     };
-  }, [refreshLiveAccountData]);
+  }, [isAutoTickerEnabled, refreshLiveAccountData]);
 
   return (
     <main className={`ta-dashboard ${isDarkMode ? "dark" : "light"}`}>

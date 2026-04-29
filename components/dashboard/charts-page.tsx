@@ -194,10 +194,8 @@ export const ChartsPage = memo(function ChartsPage({
     }
 
     void loadHistory();
-    const interval = window.setInterval(loadHistory, 30000);
     return () => {
       active = false;
-      window.clearInterval(interval);
     };
   }, [selected?.symbol, activeRange, priceRefreshVersion]);
 
