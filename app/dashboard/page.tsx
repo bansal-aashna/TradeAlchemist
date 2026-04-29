@@ -162,6 +162,9 @@ export default function DashboardPage() {
         await startSimulationTicker();
         setIsAutoTickerEnabled(true);
         setBackendMessage("Auto ticker started");
+        // Force an immediate UI fetch so the user sees instant feedback
+        setPriceRefreshVersion((v) => v + 1);
+        void refreshLiveAccountData();
       }
       setBackendStatus("connected");
     } catch (error) {

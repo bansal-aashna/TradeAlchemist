@@ -33,15 +33,15 @@ PRICE_TICKER_TASK = None
 
 async def price_ticker_loop():
     while True:
-        await asyncio.sleep(PRICE_TICK_INTERVAL_SECONDS)
         try:
-            summary = run_price_tick()
+            summary = await asyncio.to_thread(run_price_tick)
             print(
                 "Price tick complete | "
                 f"Updated {summary['updated']} stocks | State {summary['state']}"
             )
         except Exception as exc:
             print(f"Price tick failed: {exc}")
+        await asyncio.sleep(PRICE_TICK_INTERVAL_SECONDS)
 
 
 def is_price_ticker_running():
@@ -623,7 +623,7 @@ def run_simulation_tick():
 
 
 @app.post("/simulation/start")
-def start_simulation():
+async def start_simulation():
     started = start_price_ticker()
     return {
         "status": "ok",
@@ -634,7 +634,7 @@ def start_simulation():
 
 
 @app.post("/simulation/stop")
-def stop_simulation():
+async def stop_simulation():
     stopped = stop_price_ticker()
     return {
         "status": "ok",
