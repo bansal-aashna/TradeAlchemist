@@ -385,18 +385,17 @@ export const ChartsPage = memo(function ChartsPage({
               <>
                 <div className="ta-charts-crosshair ta-charts-crosshair-v" style={{ left: `${hoverXPct}%` }} />
                 <div className="ta-charts-crosshair ta-charts-crosshair-h" style={{ top: `${hoverYPct}%` }} />
+                <div
+                  className="ta-charts-tooltip"
+                  style={{ left: `${tooltipXPct}%`, top: `${tooltipYPct}%` }}
+                >
+                  <span className="ta-charts-tooltip-value">
+                    {formatCurrency(chartPrice, stockCurrency)}
+                  </span>
+                  <span className="ta-charts-tooltip-date">{chartDate}</span>
+                </div>
               </>
             ) : null}
-
-            <div
-              className="ta-charts-tooltip"
-              style={{ left: `${tooltipXPct}%`, top: `${tooltipYPct}%` }}
-            >
-              <span className="ta-charts-tooltip-value">
-                {formatCurrency(chartPrice, stockCurrency)}
-              </span>
-              <span className="ta-charts-tooltip-date">{chartDate}</span>
-            </div>
 
             <svg
               viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
