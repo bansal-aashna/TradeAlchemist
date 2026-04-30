@@ -670,10 +670,11 @@ class TradeRequest(BaseModel):
 
 @app.post("/trade/buy")
 def buy_trade(req: TradeRequest, current_user: dict = Depends(get_current_user)):
+    display_name = get_user_display_name(current_user)
     try:
         trade = execute_trade(
             current_user["uid"],
-            get_user_display_name(current_user),
+            display_name,
             req.symbol,
             req.exchange,
             "BUY",
@@ -681,21 +682,27 @@ def buy_trade(req: TradeRequest, current_user: dict = Depends(get_current_user))
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    portfolio_doc, holdings_docs = sync_portfolio_snapshot(current_user["uid"], display_name)
     return JSONResponse(
         status_code=200,
         content={
             "status": "ok",
-            "data": trade
+            "data": {
+                "trade": trade,
+                "portfolio": portfolio_doc,
+                "holdings": holdings_docs,
+            }
         }
     )
 
 
 @app.post("/trade/sell")
 def sell_trade(req: TradeRequest, current_user: dict = Depends(get_current_user)):
+    display_name = get_user_display_name(current_user)
     try:
         trade = execute_trade(
             current_user["uid"],
-            get_user_display_name(current_user),
+            display_name,
             req.symbol,
             req.exchange,
             "SELL",
@@ -703,11 +710,16 @@ def sell_trade(req: TradeRequest, current_user: dict = Depends(get_current_user)
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    portfolio_doc, holdings_docs = sync_portfolio_snapshot(current_user["uid"], display_name)
     return JSONResponse(
         status_code=200,
         content={
             "status": "ok",
-            "data": trade
+            "data": {
+                "trade": trade,
+                "portfolio": portfolio_doc,
+                "holdings": holdings_docs,
+            }
         }
     )
 

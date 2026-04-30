@@ -60,38 +60,45 @@ export function LoginForm() {
   };
 
   return (
-   <main className="ta-shell ta-auth-page">
-      <Card>
-        <div className="ta-brand-row">
-          <div className="ta-logo">
-            <img src="/logo-dark.png" alt="TradeAlchemist Logo" />
-          </div>
-          <div>
-            <h1 className="ta-title">TradeAlchemist</h1>
-            <p className="ta-subtitle">Stock Market Simulator | Paper Trader</p>
-          </div>
+    <main className="ta-shell ta-auth-page">
+      <div className="ta-auth-brand">
+        <div className="ta-logo ta-auth-logo">
+          <img src="/logo-dark.png" alt="TradeAlchemist Logo" />
         </div>
+        <h1 className="ta-auth-brand-name">TradeAlchemist</h1>
+      </div>
 
+      <Card className="ta-auth-card">
+        <div className="ta-auth-header">
+          <h2 className="ta-auth-heading">Welcome Back</h2>
+          <p className="ta-auth-copy">
+            Enter your email and password to access your portfolio.
+          </p>
+        </div>
         <form className="ta-form" onSubmit={handleSubmit(onSubmit)} noValidate>
-          <label className="ta-label" htmlFor="email">
-            Email
-          </label>
-          <Input id="email" type="email" placeholder="you@tradealchemist.app" {...register("email")} />
-          {errors.email ? <p className="ta-error">{errors.email.message}</p> : null}
+          <div className="ta-auth-field">
+            <label className="ta-label" htmlFor="email">
+              Email
+            </label>
+            <Input id="email" type="email" placeholder="m@example.com" {...register("email")} />
+            {errors.email ? <p className="ta-error">{errors.email.message}</p> : null}
+          </div>
 
-          <label className="ta-label" htmlFor="password">
-            Password
-          </label>
-          <Input id="password" type="password" placeholder="Enter your password" {...register("password")} />
-          {errors.password ? <p className="ta-error">{errors.password.message}</p> : null}
+          <div className="ta-auth-field">
+            <label className="ta-label" htmlFor="password">
+              Password
+            </label>
+            <Input id="password" type="password" placeholder="" {...register("password")} />
+            {errors.password ? <p className="ta-error">{errors.password.message}</p> : null}
+          </div>
 
-          <Button type="submit" isLoading={isSubmitting}>
-            Sign in
+          <Button type="submit" isLoading={isSubmitting} loadingText="Signing In...">
+            Sign In
           </Button>
           {authError ? <p className="ta-error">{authError}</p> : null}
         </form>
-        <p className="ta-link-row">
-          New to TradeAlchemist? <Link href="/signup">Sign up</Link>
+        <p className="ta-link-row ta-auth-link-row">
+          Don&apos;t have an account? <Link href="/signup">Sign Up</Link>
         </p>
       </Card>
     </main>

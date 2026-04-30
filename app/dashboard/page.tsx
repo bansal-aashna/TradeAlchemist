@@ -15,6 +15,7 @@ import { type DashboardTab } from "@/components/dashboard/tabs";
 import { auth } from "@/lib/firebase";
 import {
   addWatchlistItem,
+  type ApiPortfolio,
   executeBuyTrade,
   executeSellTrade,
   getBackendHealth,
@@ -64,6 +65,20 @@ function mapTransaction(
   };
 }
 
+function mapPortfolioMetrics(portfolio: ApiPortfolio | null | undefined): PortfolioMetrics | null {
+  if (!portfolio) {
+    return null;
+  }
+
+  return {
+    totalPortfolioValue: portfolio.totalPortfolioValue,
+    investmentValue: portfolio.investmentValue,
+    unrealisedPL: portfolio.unrealisedPL,
+    todaysPL: portfolio.todaysPL,
+    buyingPower: portfolio.buyingPower,
+  };
+}
+
 
 
 export default function DashboardPage() {
@@ -81,6 +96,7 @@ export default function DashboardPage() {
   const [watchlist, setWatchlist] = useState<ApiWatchlistItem[]>([]);
   const [buyingPower, setBuyingPower] = useState<number>(INITIAL_BUYING_POWER);
   const [totalPortfolioValue, setTotalPortfolioValue] = useState<number>(INITIAL_BUYING_POWER);
+  const [portfolioSnapshot, setPortfolioSnapshot] = useState<PortfolioMetrics | null>(null);
   const [userName, setUserName] = useState<string>("");
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
   const [priceRefreshVersion, setPriceRefreshVersion] = useState(0);
@@ -116,6 +132,7 @@ export default function DashboardPage() {
     if (portfolio.status === "fulfilled") {
       setBuyingPower(portfolio.value?.buyingPower ?? INITIAL_BUYING_POWER);
       setTotalPortfolioValue(portfolio.value?.totalPortfolioValue ?? INITIAL_BUYING_POWER);
+      setPortfolioSnapshot(mapPortfolioMetrics(portfolio.value));
     }
     if (holdingsData.status === "fulfilled") {
       setHoldings(holdingsData.value.map(mapHolding));
@@ -280,11 +297,21 @@ export default function DashboardPage() {
           exchange: activeTrade.exchange,
           quantity: shares,
         };
+        const tradeResult =
+          activeTrade.type === "buy"
+            ? await executeBuyTrade(token, request)
+            : await executeSellTrade(token, request);
 
-        if (activeTrade.type === "buy") {
-          await executeBuyTrade(token, request);
-        } else {
-          await executeSellTrade(token, request);
+        const immediatePortfolio = tradeResult.portfolio;
+        const immediateHoldings = tradeResult.holdings ?? [];
+
+        if (immediatePortfolio) {
+          setBuyingPower(immediatePortfolio.buyingPower ?? INITIAL_BUYING_POWER);
+          setTotalPortfolioValue(immediatePortfolio.totalPortfolioValue ?? INITIAL_BUYING_POWER);
+          setPortfolioSnapshot(mapPortfolioMetrics(immediatePortfolio));
+        }
+        if (immediateHoldings.length > 0 || activeTrade.type === "sell") {
+          setHoldings(immediateHoldings.map(mapHolding));
         }
 
         const [portfolio, holdingsData, transactionsData] = await Promise.all([
@@ -293,10 +320,11 @@ export default function DashboardPage() {
           getTransactions(token),
         ]);
 
-        setHoldings(holdingsData.map(mapHolding));
         setTransactions(transactionsData.map(mapTransaction));
+        setHoldings(holdingsData.map(mapHolding));
         setBuyingPower(portfolio?.buyingPower ?? INITIAL_BUYING_POWER);
         setTotalPortfolioValue(portfolio?.totalPortfolioValue ?? INITIAL_BUYING_POWER);
+        setPortfolioSnapshot(mapPortfolioMetrics(portfolio));
         setTradeMessage(null);
         setActiveTrade(null);
       } catch (error) {
@@ -318,13 +346,13 @@ export default function DashboardPage() {
     const unrealisedPL = marketValue - investmentValue;
     const todaysPL = holdings.reduce((sum, holding) => sum + (holding.totalPL ?? 0), 0);
     return {
-      totalPortfolioValue,
-      investmentValue,
-      unrealisedPL,
-      todaysPL,
-      buyingPower,
+      totalPortfolioValue: portfolioSnapshot?.totalPortfolioValue ?? totalPortfolioValue,
+      investmentValue: portfolioSnapshot?.investmentValue ?? investmentValue,
+      unrealisedPL: portfolioSnapshot?.unrealisedPL ?? unrealisedPL,
+      todaysPL: portfolioSnapshot?.todaysPL ?? todaysPL,
+      buyingPower: portfolioSnapshot?.buyingPower ?? buyingPower,
     };
-  }, [buyingPower, holdings, totalPortfolioValue]);
+  }, [buyingPower, holdings, portfolioSnapshot, totalPortfolioValue]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = isDarkMode ? "dark" : "light";
@@ -407,6 +435,9 @@ export default function DashboardPage() {
           portfolio.status === "fulfilled"
             ? portfolio.value?.buyingPower ?? INITIAL_BUYING_POWER
             : INITIAL_BUYING_POWER,
+        );
+        setPortfolioSnapshot(
+          portfolio.status === "fulfilled" ? mapPortfolioMetrics(portfolio.value) : null,
         );
         setTotalPortfolioValue(
           portfolio.status === "fulfilled"

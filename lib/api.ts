@@ -161,6 +161,12 @@ export type ExecuteTradeRequest = {
   quantity: number;
 };
 
+export type ApiTradeExecution = {
+  trade?: Record<string, unknown>;
+  portfolio?: ApiPortfolio | null;
+  holdings?: ApiHolding[];
+};
+
 async function fetchJson(path: string) {
   const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
     method: "GET",
@@ -606,11 +612,41 @@ export async function removeWatchlistItem(
 }
 
 export async function executeBuyTrade(token: string, request: ExecuteTradeRequest) {
-  return fetchAuthenticatedJsonWithBody("/trade/buy", token, "POST", request);
+  const payload = await fetchAuthenticatedJsonWithBody("/trade/buy", token, "POST", request);
+  const data = payload.data;
+  const record = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+  return {
+    trade: record?.trade && typeof record.trade === "object" ? record.trade as Record<string, unknown> : undefined,
+    portfolio:
+      record?.portfolio && typeof record.portfolio === "object"
+        ? (record.portfolio as ApiPortfolio)
+        : null,
+    holdings:
+      record?.holdings && Array.isArray(record.holdings)
+        ? record.holdings
+            .map((item) => normalizeHoldingItem(item as Record<string, unknown>))
+            .filter((item): item is ApiHolding => item !== null)
+        : [],
+  } as ApiTradeExecution;
 }
 
 export async function executeSellTrade(token: string, request: ExecuteTradeRequest) {
-  return fetchAuthenticatedJsonWithBody("/trade/sell", token, "POST", request);
+  const payload = await fetchAuthenticatedJsonWithBody("/trade/sell", token, "POST", request);
+  const data = payload.data;
+  const record = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+  return {
+    trade: record?.trade && typeof record.trade === "object" ? record.trade as Record<string, unknown> : undefined,
+    portfolio:
+      record?.portfolio && typeof record.portfolio === "object"
+        ? (record.portfolio as ApiPortfolio)
+        : null,
+    holdings:
+      record?.holdings && Array.isArray(record.holdings)
+        ? record.holdings
+            .map((item) => normalizeHoldingItem(item as Record<string, unknown>))
+            .filter((item): item is ApiHolding => item !== null)
+        : [],
+  } as ApiTradeExecution;
 }
 
 export async function runSimulationTick() {
