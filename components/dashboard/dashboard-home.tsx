@@ -6,6 +6,7 @@ import type { TradeDraft } from "@/components/dashboard/trade-modal";
 import type { TransactionRecord } from "@/components/dashboard/transaction-history-table";
 import { searchStocks, type ApiStock, type ApiWatchlistItem } from "@/lib/api";
 import { EXCHANGE_OPTIONS, type ExchangeId } from "@/lib/exchanges";
+import type { DashboardTab } from "@/components/dashboard/tabs";
 
 type DashboardHomeProps = {
   holdings?: PortfolioHolding[];
@@ -15,6 +16,7 @@ type DashboardHomeProps = {
   onTradeAction: (trade: TradeDraft) => void;
   onAddWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onRemoveWatchlist: (item: ApiWatchlistItem) => Promise<void>;
+  onPreviewNavigate: (tab: DashboardTab) => void;
   priceRefreshVersion?: number;
 };
 
@@ -68,6 +70,7 @@ export const DashboardHome = memo(function DashboardHome({
   onTradeAction,
   onAddWatchlist,
   onRemoveWatchlist,
+  onPreviewNavigate,
   priceRefreshVersion = 0,
 }: DashboardHomeProps) {
   const [stocks, setStocks] = useState<ApiStock[]>([]);
@@ -271,7 +274,18 @@ export const DashboardHome = memo(function DashboardHome({
       </article>
 
       <div className="ta-dashboard-home-grid">
-        <article className="ta-dashboard-section-card">
+        <article
+          className="ta-dashboard-section-card ta-dashboard-preview-card"
+          role="button"
+          tabIndex={0}
+          onClick={() => onPreviewNavigate("Portfolio")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onPreviewNavigate("Portfolio");
+            }
+          }}
+        >
           <h3 className="ta-holdings-title">Portfolio Holdings Preview</h3>
           <div className="ta-holdings-table-wrap">
             <table className="ta-holdings-table">
@@ -302,7 +316,8 @@ export const DashboardHome = memo(function DashboardHome({
                           type="button"
                           className="ta-type-pill ta-type-pill-btn sell ta-sell-pill-btn"
                           disabled={!holding.currentPrice || !holding.quantity}
-                          onClick={() => {
+                          onClick={(event) => {
+                            event.stopPropagation();
                             if (!holding.currentPrice || !holding.quantity) {
                               return;
                             }
@@ -333,7 +348,18 @@ export const DashboardHome = memo(function DashboardHome({
           </div>
         </article>
 
-        <article className="ta-dashboard-section-card">
+        <article
+          className="ta-dashboard-section-card ta-dashboard-preview-card"
+          role="button"
+          tabIndex={0}
+          onClick={() => onPreviewNavigate("Market Watch")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onPreviewNavigate("Market Watch");
+            }
+          }}
+        >
           <h3 className="ta-holdings-title">Watchlist Preview</h3>
           <div className="ta-holdings-table-wrap">
             <table className="ta-holdings-table">
@@ -359,7 +385,8 @@ export const DashboardHome = memo(function DashboardHome({
                         <button
                           type="button"
                           className="ta-type-pill ta-type-pill-btn buy"
-                          onClick={() => {
+                          onClick={(event) => {
+                            event.stopPropagation();
                             if (!stock.currentPrice) {
                               return;
                             }
@@ -380,7 +407,10 @@ export const DashboardHome = memo(function DashboardHome({
                         <button
                           type="button"
                           className="ta-delete-icon"
-                          onClick={() => onRemoveWatchlist(stock)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void onRemoveWatchlist(stock);
+                          }}
                         >
                           <img
                             src={isDarkMode ? "/bin-dark.png" : "/bin-light.png"}
@@ -405,7 +435,18 @@ export const DashboardHome = memo(function DashboardHome({
         </article>
       </div>
 
-      <article className="ta-dashboard-section-card">
+      <article
+        className="ta-dashboard-section-card ta-dashboard-preview-card"
+        role="button"
+        tabIndex={0}
+        onClick={() => onPreviewNavigate("Transaction History")}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onPreviewNavigate("Transaction History");
+          }
+        }}
+      >
         <h3 className="ta-holdings-title">Recent Transactions</h3>
         <div className="ta-holdings-table-wrap">
           <table className="ta-holdings-table">

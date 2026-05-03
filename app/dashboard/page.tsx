@@ -555,6 +555,7 @@ export default function DashboardPage() {
         onTradeAction={handleTradeAction}
         onAddWatchlist={handleAddWatchlist}
         onRemoveWatchlist={handleRemoveWatchlist}
+        onPreviewNavigate={handleTabChange}
         priceRefreshVersion={priceRefreshVersion}
       />
       {tradeMessage ? <p className="ta-global-message">{tradeMessage}</p> : null}

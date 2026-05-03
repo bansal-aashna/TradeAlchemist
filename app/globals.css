@@ -691,7 +691,7 @@ select:focus-visible {
 
 .ta-topbar-greeting {
   margin: 0;
-  font-size: var(--text-lg);
+  font-size: var(--text-2xl);
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
@@ -701,7 +701,7 @@ select:focus-visible {
 .ta-tabs {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: 2.5rem;
   overflow-x: auto;
   white-space: nowrap;
   padding-bottom: 0;
@@ -713,8 +713,21 @@ select:focus-visible {
   padding: 0.2rem 0.4rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: var(--text-xl);
+  font-size: var(--text-4xl);
   color: var(--text-secondary);
+  transition: background var(--transition-fast), color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.ta-tab:hover {
+  background: color-mix(in srgb, var(--border-secondary) 28%, var(--bg-tertiary) 72%);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.ta-tab:focus-visible {
+  background: color-mix(in srgb, var(--border-secondary) 28%, var(--bg-tertiary) 72%);
+  color: var(--text-primary);
 }
 
 .ta-tab.active {
@@ -915,6 +928,23 @@ select:focus-visible {
   display: grid;
   gap: 0.6rem;
   align-content: start;
+}
+
+.ta-dashboard-preview-card {
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.ta-dashboard-preview-card:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 30%, var(--border-light) 70%);
+  background: color-mix(in srgb, var(--bg-primary) 88%, var(--bg-tertiary) 12%);
+  transform: translateY(-1px);
+}
+
+.ta-dashboard-preview-card:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-secondary) 70%, #7ad9a3 30%);
+  outline-offset: 2px;
 }
 
 .ta-dashboard-section-card {
@@ -2165,6 +2195,18 @@ button.ta-watch-result-item {
   width: 18px;
   height: 18px;
   object-fit: contain;
+}
+
+.ta-nav-link {
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all var(--transition-base);
+}
+
+.ta-nav-link:hover {
+  background: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+  color: var(--accent-primary);
+  text-decoration: none;
 }
 
 /* ===== UTILITY CLASSES ===== */

@@ -27,6 +27,7 @@ type DashboardContentProps = {
   onTradeAction: (trade: TradeDraft) => void;
   onAddWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onRemoveWatchlist: (item: ApiWatchlistItem) => Promise<void>;
+  onPreviewNavigate: (tab: DashboardTab) => void;
   priceRefreshVersion: number;
 };
 
@@ -40,6 +41,7 @@ export const DashboardContent = memo(function DashboardContent({
   onTradeAction,
   onAddWatchlist,
   onRemoveWatchlist,
+  onPreviewNavigate,
   priceRefreshVersion,
 }: DashboardContentProps) {
   if (activeTab === "Dashboard") {
@@ -52,6 +54,7 @@ export const DashboardContent = memo(function DashboardContent({
         onTradeAction={onTradeAction}
         onAddWatchlist={onAddWatchlist}
         onRemoveWatchlist={onRemoveWatchlist}
+        onPreviewNavigate={onPreviewNavigate}
         priceRefreshVersion={priceRefreshVersion}
       />
     );
