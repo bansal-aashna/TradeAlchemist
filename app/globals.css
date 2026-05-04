@@ -1259,10 +1259,25 @@ select:focus-visible {
   align-items: center;
 }
 
-.ta-dashboard-home-grid {
+.ta-dh-main-grid-2col {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 3fr 1fr;
   gap: 0.75rem;
+  align-items: start;
+}
+
+.ta-dh-selected-grid {
+  display: grid;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.ta-dh-left,
+.ta-dh-right {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
 .ta-dashboard-selected-row {
@@ -2315,7 +2330,8 @@ button.ta-watch-result-item {
 }
 
 @media (max-width: 860px) {
-  .ta-dashboard-home-grid {
+  .ta-dh-main-grid-2col,
+  .ta-dh-selected-grid {
     grid-template-columns: 1fr;
   }
 
