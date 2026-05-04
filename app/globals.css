@@ -31,9 +31,9 @@
   /* Background tokens used by page wrappers, cards, topbar, strip. */
   --bg-primary: #000000;
   --bg-secondary: #000000;
-  --bg-tertiary: #111319;
-  --bg-elevated: #05070c;
-  --bg-content: #1b1d22;
+  --bg-tertiary: #000000;
+  --bg-elevated: #111010;
+  --bg-content: #111010;
   /* Content panels on dashboard pages */
   --bg-topbar: #000000;
   /* Dashboard top navigation background */
