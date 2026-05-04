@@ -274,19 +274,14 @@ export const DashboardHome = memo(function DashboardHome({
       </article>
 
       <div className="ta-dashboard-home-grid">
-        <article
-          className="ta-dashboard-section-card ta-dashboard-preview-card"
-          role="button"
-          tabIndex={0}
-          onClick={() => onPreviewNavigate("Portfolio")}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              onPreviewNavigate("Portfolio");
-            }
-          }}
-        >
-          <h3 className="ta-holdings-title">Portfolio Holdings Preview</h3>
+        <article className="ta-dashboard-section-card">
+          <button
+            type="button"
+            className="ta-preview-link"
+            onClick={() => onPreviewNavigate("Portfolio")}
+          >
+            <h3 className="ta-holdings-title">Portfolio Holdings Preview</h3>
+          </button>
           <div className="ta-holdings-table-wrap">
             <table className="ta-holdings-table">
               <thead>
@@ -348,19 +343,14 @@ export const DashboardHome = memo(function DashboardHome({
           </div>
         </article>
 
-        <article
-          className="ta-dashboard-section-card ta-dashboard-preview-card"
-          role="button"
-          tabIndex={0}
-          onClick={() => onPreviewNavigate("Market Watch")}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              onPreviewNavigate("Market Watch");
-            }
-          }}
-        >
-          <h3 className="ta-holdings-title">Watchlist Preview</h3>
+        <article className="ta-dashboard-section-card">
+          <button
+            type="button"
+            className="ta-preview-link"
+            onClick={() => onPreviewNavigate("Market Watch")}
+          >
+            <h3 className="ta-holdings-title">Watchlist Preview</h3>
+          </button>
           <div className="ta-holdings-table-wrap">
             <table className="ta-holdings-table">
               <thead>
@@ -435,19 +425,14 @@ export const DashboardHome = memo(function DashboardHome({
         </article>
       </div>
 
-      <article
-        className="ta-dashboard-section-card ta-dashboard-preview-card"
-        role="button"
-        tabIndex={0}
-        onClick={() => onPreviewNavigate("Transaction History")}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onPreviewNavigate("Transaction History");
-          }
-        }}
-      >
-        <h3 className="ta-holdings-title">Recent Transactions</h3>
+      <article className="ta-dashboard-section-card">
+        <button
+          type="button"
+          className="ta-preview-link"
+          onClick={() => onPreviewNavigate("Transaction History")}
+        >
+          <h3 className="ta-holdings-title">Recent Transactions</h3>
+        </button>
         <div className="ta-holdings-table-wrap">
           <table className="ta-holdings-table">
             <thead>

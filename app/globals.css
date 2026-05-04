@@ -930,21 +930,26 @@ select:focus-visible {
   align-content: start;
 }
 
-.ta-dashboard-preview-card {
+.ta-preview-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0 0 0.35rem;
   cursor: pointer;
-  transition: border-color var(--transition-fast), background var(--transition-fast),
-    transform var(--transition-fast);
+  text-align: left;
+  color: inherit;
+  transition: color var(--transition-fast), opacity var(--transition-fast);
 }
 
-.ta-dashboard-preview-card:hover {
-  border-color: color-mix(in srgb, var(--accent-primary) 30%, var(--border-light) 70%);
-  background: color-mix(in srgb, var(--bg-primary) 88%, var(--bg-tertiary) 12%);
-  transform: translateY(-1px);
+.ta-preview-link:hover .ta-holdings-title,
+.ta-preview-link:focus-visible .ta-holdings-title {
+  color: var(--accent-primary);
 }
 
-.ta-dashboard-preview-card:focus-visible {
+.ta-preview-link:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--accent-secondary) 70%, #7ad9a3 30%);
-  outline-offset: 2px;
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .ta-dashboard-section-card {
