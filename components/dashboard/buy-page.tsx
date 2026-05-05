@@ -395,6 +395,7 @@ export const BuyPage = memo(function BuyPage({
 
                     <svg
                       viewBox="0 0 940 300"
+                      preserveAspectRatio="none"
                       className="ta-charts-plot"
                       role="img"
                       aria-label={`${selectedStock.symbol} historical performance`}
@@ -409,8 +410,8 @@ export const BuyPage = memo(function BuyPage({
                     >
                       <defs>
                         <linearGradient id="taBuyChartFill" x1="0" x2="0" y1="0" y2="1">
-                          <stop offset="0%" stopColor={diff >= 0 ? "rgba(26,115,232,0.12)" : "rgba(230,64,54,0.12)"} />
-                          <stop offset="100%" stopColor={diff >= 0 ? "rgba(26,115,232,0)" : "rgba(230,64,54,0)"} />
+                          <stop offset="0%" stopColor={diff >= 0 ? "rgba(22, 199, 132, 0.12)" : "rgba(200, 35, 51, 0.12)"} />
+                          <stop offset="100%" stopColor={diff >= 0 ? "rgba(22, 199, 132, 0)" : "rgba(200, 35, 51, 0)"} />
                         </linearGradient>
                       </defs>
                       {prevCloseY !== null && !isNaN(prevCloseY) ? (

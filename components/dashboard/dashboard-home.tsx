@@ -16,7 +16,9 @@ type DashboardHomeProps = {
   transactions: TransactionRecord[];
   watchlist: ApiWatchlistItem[];
   isDarkMode: boolean;
+  buyingPower?: number;
   onTradeAction: (trade: TradeDraft) => void;
+  onExecuteTrade?: (trade: TradeDraft, shares: number) => Promise<void>;
   onAddWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onRemoveWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onPreviewNavigate: (tab: DashboardTab) => void;
@@ -123,7 +125,9 @@ export const DashboardHome = memo(function DashboardHome({
   transactions,
   watchlist,
   isDarkMode,
+  buyingPower,
   onTradeAction,
+  onExecuteTrade,
   onAddWatchlist,
   onRemoveWatchlist,
   onPreviewNavigate,
@@ -134,6 +138,9 @@ export const DashboardHome = memo(function DashboardHome({
   const [query, setQuery] = useState("");
   const [selectedSymbol, setSelectedSymbol] = useState("");
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [tradeMode, setTradeMode] = useState<"buy" | "sell">("buy");
+  const [shares, setShares] = useState<string>("0");
+  const [isTrading, setIsTrading] = useState(false);
 
   const [activeRange, setActiveRange] = useState<RangeOption>("1Y");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -288,13 +295,11 @@ export const DashboardHome = memo(function DashboardHome({
 
   return (
     <section className="ta-dashboard-content ta-dashboard-home">
-      <h2>Dashboard</h2>
 
       <div className="ta-dh-main-grid-2col">
         <div className="ta-dh-left">
-          <article className="ta-dashboard-section-card">
-            <h3 className="ta-holdings-title">Search and Buy</h3>
-        <div className="ta-buy-search-card">
+        <article className="ta-dashboard-section-card">
+
           <div className="ta-buy-search-row">
             <div className="ta-buy-select-wrap">
               <select
@@ -341,7 +346,7 @@ export const DashboardHome = memo(function DashboardHome({
               ) : null}
             </div>
           </div>
-        </div>
+        </article>
         {query.trim() && !selectedSymbol ? (
           <div className="ta-watch-search-results">
             {filteredStocks.length > 0 ? (
@@ -370,8 +375,6 @@ export const DashboardHome = memo(function DashboardHome({
           </div>
         ) : null}
 
-          </article>
-
         {selectedStock ? (
           <div className="ta-dh-selected-grid">
             {/* Chart Column */}
@@ -390,7 +393,7 @@ export const DashboardHome = memo(function DashboardHome({
                 </div>
               </div>
 
-              <div className="ta-buy-chart-placeholder" style={{ marginTop: '1rem', border: 'none', background: 'transparent' }}>
+              <div style={{ marginTop: '1rem', border: 'none', background: 'transparent' }}>
                 <div className="ta-buy-chart-live">
                   <div className="ta-charts-ranges">
                     {rangeOptions.map((range) => (
@@ -408,7 +411,7 @@ export const DashboardHome = memo(function DashboardHome({
                     ))}
                   </div>
 
-                  <div className="ta-charts-plot-wrap">
+                  <div className="ta-charts-plot-wrap" style={{ minHeight: '280px', height: '280px' }}>
                     {hoverX !== null && hoverY !== null ? (
                       <>
                         <div className="ta-charts-crosshair ta-charts-crosshair-v" style={{ left: `${hoverXPct}%` }} />
@@ -424,6 +427,7 @@ export const DashboardHome = memo(function DashboardHome({
 
                     <svg
                       viewBox="0 0 940 300"
+                      preserveAspectRatio="none"
                       className="ta-charts-plot"
                       role="img"
                       aria-label={`${selectedStock.symbol} historical performance`}
@@ -437,9 +441,9 @@ export const DashboardHome = memo(function DashboardHome({
                       onMouseLeave={() => setHoverIndex(null)}
                     >
                       <defs>
-                        <linearGradient id="taBuyChartFill" x1="0" x2="0" y1="0" y2="1">
-                          <stop offset="0%" stopColor={diff >= 0 ? "rgba(26,115,232,0.12)" : "rgba(230,64,54,0.12)"} />
-                          <stop offset="100%" stopColor={diff >= 0 ? "rgba(26,115,232,0)" : "rgba(230,64,54,0)"} />
+                        <linearGradient id="taDashboardChartFill" x1="0" x2="0" y1="0" y2="1">
+                          <stop offset="0%" stopColor={diff >= 0 ? "rgba(22, 199, 132, 0.12)" : "rgba(200, 35, 51, 0.12)"} />
+                          <stop offset="100%" stopColor={diff >= 0 ? "rgba(22, 199, 132, 0)" : "rgba(200, 35, 51, 0)"} />
                         </linearGradient>
                       </defs>
                       {prevCloseY !== null && !isNaN(prevCloseY) ? (
@@ -451,7 +455,7 @@ export const DashboardHome = memo(function DashboardHome({
                           strokeWidth="1.5"
                         />
                       ) : null}
-                      <path d={`${chartPath} L940,300 L0,300 Z`} fill="url(#taBuyChartFill)" />
+                      <path d={`${chartPath} L940,300 L0,300 Z`} fill="url(#taDashboardChartFill)" />
                       <path d={chartPath} className={`ta-charts-line ${tone}`} />
                     </svg>
                     <div className="ta-charts-axis-y">
@@ -470,83 +474,144 @@ export const DashboardHome = memo(function DashboardHome({
             </article>
 
             {/* Trade Column */}
-            <article className="ta-dashboard-section-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <h3 className="ta-holdings-title" style={{ fontSize: '1.25rem', marginBottom: '0.25rem' }}>Trade {selectedStock.symbol}</h3>
-                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Place buy or sell orders for this stock.</p>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+            <article className="ta-dashboard-section-card ta-trade-card">
+              <h3 className="ta-holdings-title">Trade {selectedStock.symbol}</h3>
+              <p className="ta-holdings-subtitle">Place buy or sell orders for this stock.</p>
+
+              {/* Buy / Sell segmented control */}
+              <div className="ta-trade-seg-wrap">
                 <button
                   type="button"
-                  className="ta-buy-action-btn ta-trade-pill buy"
-                  style={{ width: '100%', minHeight: '44px', justifyContent: 'center' }}
-                  disabled={!selectedStock.currentPrice}
-                  onClick={() => {
-                    if (!selectedStock.currentPrice) return;
-                    onTradeAction({
-                      ticker: selectedStock.symbol,
-                      company: selectedStock.companyName,
-                      exchange: selectedStock.exchange,
-                      price: selectedStock.currentPrice,
-                      type: "buy",
-                    });
-                  }}
+                  className={`ta-trade-seg-btn ${tradeMode === 'buy' ? 'active' : ''}`}
+                  onClick={() => setTradeMode('buy')}
                 >
                   Buy
                 </button>
                 <button
                   type="button"
-                  className="ta-buy-action-btn ta-trade-pill sell"
-                  style={{ width: '100%', minHeight: '44px', justifyContent: 'center' }}
-                  disabled={!selectedStock.currentPrice || !(holdings?.find(h => h.ticker === selectedStock.symbol)?.quantity)}
-                  onClick={() => {
-                    if (!selectedStock.currentPrice) return;
-                    const maxShares = holdings?.find(h => h.ticker === selectedStock.symbol)?.quantity ?? 0;
-                    if (maxShares <= 0) return;
-                    onTradeAction({
-                      ticker: selectedStock.symbol,
-                      company: selectedStock.companyName,
-                      exchange: selectedStock.exchange,
-                      price: selectedStock.currentPrice,
-                      type: "sell",
-                      maxShares
-                    });
-                  }}
+                  className={`ta-trade-seg-btn ${tradeMode === 'sell' ? 'active' : ''}`}
+                  onClick={() => setTradeMode('sell')}
                 >
                   Sell
                 </button>
-                <button
-                  type="button"
-                  className="ta-watch-add-btn"
-                  style={{ width: '100%', minHeight: '44px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}
-                  onClick={() =>
-                    onAddWatchlist({
-                      ticker: selectedStock.symbol,
-                      companyName: selectedStock.companyName,
-                      exchange: selectedStock.exchange,
-                    })
-                  }
-                >
-                  + Add to Watchlist
-                </button>
               </div>
+
+              {/* Shares input */}
+              <div className="ta-trade-field">
+                <label className="ta-trade-field-label">Shares</label>
+                <div className="ta-trade-shares-row">
+                  <input
+                    type="number"
+                    min="0"
+                    className="ta-trade-shares-input"
+                    value={shares}
+                    onChange={(e) => setShares(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="ta-trade-max-btn"
+                    onClick={() => {
+                      if (tradeMode === 'sell') {
+                        const maxSell = holdings?.find(h => h.ticker === selectedStock.symbol)?.quantity ?? 0;
+                        setShares(String(maxSell));
+                      } else if (selectedStock.currentPrice && selectedStock.currentPrice > 0) {
+                        const maxBuy = Math.floor((buyingPower ?? 0) / selectedStock.currentPrice);
+                        setShares(String(maxBuy));
+                      }
+                    }}
+                  >
+                    Max
+                  </button>
+                </div>
+              </div>
+
+              {/* Estimated cost & buying power */}
+              <div className="ta-trade-info">
+                <div className="ta-trade-info-row">
+                  <span>Estimated Cost:</span>
+                  <span>{formatCurrencyByCode((Number(shares) || 0) * (selectedStock.currentPrice ?? 0), stockCurrency)}</span>
+                </div>
+                <div className="ta-trade-info-row">
+                  <span>Buying Power:</span>
+                  <span>{formatCurrency(buyingPower ?? 0)}</span>
+                </div>
+              </div>
+
+              {/* CTA */}
+              <button
+                type="button"
+                className={`ta-trade-cta-btn ${tradeMode}`}
+                disabled={isTrading || !selectedStock.currentPrice || Number(shares) <= 0 || (tradeMode === 'sell' && !(holdings?.find(h => h.ticker === selectedStock.symbol)?.quantity))}
+                onClick={async () => {
+                  if (isTrading || !selectedStock.currentPrice || !onExecuteTrade) return;
+                  const qty = Number(shares);
+                  if (isNaN(qty) || qty <= 0) return;
+                  
+                  setIsTrading(true);
+                  try {
+                    if (tradeMode === 'sell') {
+                      const maxShares = holdings?.find(h => h.ticker === selectedStock.symbol)?.quantity ?? 0;
+                      if (maxShares <= 0 || qty > maxShares) return;
+                      await onExecuteTrade({ ticker: selectedStock.symbol, company: selectedStock.companyName, exchange: selectedStock.exchange, price: selectedStock.currentPrice, type: 'sell', maxShares }, qty);
+                    } else {
+                      await onExecuteTrade({ ticker: selectedStock.symbol, company: selectedStock.companyName, exchange: selectedStock.exchange, price: selectedStock.currentPrice, type: 'buy' }, qty);
+                    }
+                    
+                    // Reset shares after successful trade
+                    setShares("0");
+                  } finally {
+                    setIsTrading(false);
+                  }
+                }}
+              >
+                {isTrading ? 'Processing...' : (tradeMode === 'buy' ? 'Place Buy Order' : 'Place Sell Order')}
+              </button>
+
+              {/* Add to watchlist */}
+              <button
+                type="button"
+                className="ta-trade-watchlist-btn"
+                onClick={() => onAddWatchlist({ ticker: selectedStock.symbol, companyName: selectedStock.companyName, exchange: selectedStock.exchange })}
+              >
+                + Add to Watchlist
+              </button>
             </article>
           </div>
         ) : (
           <div className="ta-dh-selected-grid">
-            <article className="ta-dashboard-section-card ta-buy-chart-placeholder" style={{ padding: '1.25rem' }}>
-              <div className="ta-buy-chart-line" />
+            <article className="ta-dashboard-section-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+              <div className="ta-buy-selected-card ta-dashboard-selected-row" style={{ marginTop: 0, paddingBottom: '1rem', borderBottom: '1px solid var(--border-secondary)', opacity: 0.4 }}>
+                <div>
+                  <p className="ta-buy-selected-symbol">--</p>
+                  <p className="ta-buy-selected-company">--</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p className="ta-buy-selected-price">--</p>
+                </div>
+              </div>
+              <div style={{ marginTop: '1rem', border: 'none', background: 'transparent', minHeight: '280px', position: 'relative' }}>
+                <div className="ta-buy-chart-line" />
+              </div>
             </article>
-            <article className="ta-dashboard-section-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', opacity: 0.4, pointerEvents: 'none' }}>
-              <div>
-                <h3 className="ta-holdings-title" style={{ fontSize: '1.25rem', marginBottom: '0.25rem' }}>Trade</h3>
-                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Select a stock to trade.</p>
+            <article className="ta-dashboard-section-card ta-trade-card" style={{ opacity: 0.4, pointerEvents: 'none' }}>
+              <h3 className="ta-holdings-title">Trade</h3>
+              <p className="ta-holdings-subtitle">Select a stock to trade.</p>
+              <div className="ta-trade-seg-wrap">
+                <button type="button" className="ta-trade-seg-btn active" disabled>Buy</button>
+                <button type="button" className="ta-trade-seg-btn" disabled>Sell</button>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
-                <button type="button" className="ta-buy-action-btn ta-trade-pill buy" style={{ width: '100%', minHeight: '44px', justifyContent: 'center' }} disabled>Buy</button>
-                <button type="button" className="ta-buy-action-btn ta-trade-pill sell" style={{ width: '100%', minHeight: '44px', justifyContent: 'center' }} disabled>Sell</button>
-                <button type="button" className="ta-watch-add-btn" style={{ width: '100%', minHeight: '44px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: '6px', fontWeight: 600 }} disabled>+ Add to Watchlist</button>
+              <div className="ta-trade-field">
+                <label className="ta-trade-field-label">Shares</label>
+                <div className="ta-trade-shares-row">
+                  <input type="number" className="ta-trade-shares-input" value="0" readOnly />
+                  <button type="button" className="ta-trade-max-btn" disabled>Max</button>
+                </div>
               </div>
+              <div className="ta-trade-info">
+                <div className="ta-trade-info-row"><span>Estimated Cost:</span><span>$0.00</span></div>
+                <div className="ta-trade-info-row"><span>Buying Power:</span><span>{formatCurrency(buyingPower ?? 0)}</span></div>
+              </div>
+              <button type="button" className="ta-trade-cta-btn buy" disabled>Place Buy Order</button>
             </article>
           </div>
         )}
@@ -561,8 +626,9 @@ export const DashboardHome = memo(function DashboardHome({
               className="ta-preview-link"
               onClick={() => onPreviewNavigate("Market Watch")}
             >
-              <h3 className="ta-holdings-title">Watchlist Preview</h3>
+              <h3 className="ta-holdings-title">Watchlist</h3>
             </button>
+            <p className="ta-holdings-subtitle">Stocks you are watching.</p>
             <div className="ta-holdings-table-wrap">
               <table className="ta-holdings-table">
                 <thead>
@@ -575,7 +641,7 @@ export const DashboardHome = memo(function DashboardHome({
                 </thead>
                 <tbody>
                   {watchlist.length > 0 ? (
-                    watchlist.map((stock) => (
+                    watchlist.slice(0, 5).map((stock) => (
                       <tr key={`${stock.exchange}-${stock.ticker}`}>
                         <td>{stock.ticker}</td>
                         <td>{stock.companyName}</td>
@@ -602,33 +668,38 @@ export const DashboardHome = memo(function DashboardHome({
               className="ta-preview-link"
               onClick={() => onPreviewNavigate("Portfolio")}
             >
-              <h3 className="ta-holdings-title">All Holdings</h3>
+              <h3 className="ta-holdings-title">Holdings</h3>
             </button>
+            <p className="ta-holdings-subtitle">A summary of your major stock holdings.</p>
             <div className="ta-holdings-table-wrap">
               <table className="ta-holdings-table">
                 <thead>
                   <tr>
                     <th>Stock</th>
-                    <th>Current Price</th>
-                    <th>Hold Price</th>
-                    <th>Total P/L</th>
+                    <th>Market Value</th>
+                    <th>Day's Gain</th>
+                    <th>Total Gain</th>
                   </tr>
                 </thead>
                 <tbody>
                   {previewHoldings.length > 0 ? (
-                    previewHoldings.map((holding) => (
-                      <tr key={holding.ticker}>
-                        <td>
-                          <p className="ta-holding-ticker">{holding.ticker}</p>
-                          <p className="ta-holding-qty">Qty: {holding.quantity ?? "--"}</p>
-                        </td>
-                        <td>{formatCurrency(holding.currentPrice)}</td>
-                        <td>{formatCurrency(holding.holdPrice)}</td>
-                        <td className={getTone(holding.totalPL)}>
-                          {formatCurrency(holding.totalPL)}
-                        </td>
-                      </tr>
-                    ))
+                    previewHoldings.map((holding) => {
+                      const marketValue = (holding.currentPrice ?? 0) * (holding.quantity ?? 0);
+                      const holdValue = (holding.holdPrice ?? 0) * (holding.quantity ?? 0);
+                      const dayGain = (holding.currentPrice ?? 0) - (holding.holdPrice ?? 0);
+                      const totalPL = holding.totalPL ?? (marketValue - holdValue);
+                      return (
+                        <tr key={holding.ticker}>
+                          <td>
+                            <p className="ta-holding-ticker">{holding.ticker}</p>
+                            <p className="ta-holding-qty">{holding.quantity ?? "--"} shares</p>
+                          </td>
+                          <td>{formatCurrency(marketValue)}</td>
+                          <td className={getTone(dayGain)}>{dayGain >= 0 ? "+" : ""}{formatCurrency(dayGain)}</td>
+                          <td className={getTone(totalPL)}>{formatCurrency(totalPL)}</td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
                       <td colSpan={4} className="ta-holdings-empty">
@@ -649,28 +720,35 @@ export const DashboardHome = memo(function DashboardHome({
             >
               <h3 className="ta-holdings-title">Recent Transactions</h3>
             </button>
+            <p className="ta-holdings-subtitle">Your 5 most recent trades.</p>
             <div className="ta-holdings-table-wrap">
               <table className="ta-holdings-table">
                 <thead>
                   <tr>
+                    <th>Details</th>
                     <th>Date</th>
-                    <th>Ticker</th>
-                    <th>Type</th>
-                    <th>Value</th>
+                    <th>P/L</th>
+                    <th>Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentTransactions.length > 0 ? (
                     recentTransactions.map((transaction) => (
                       <tr key={transaction.id}>
-                        <td style={{ fontSize: '0.85rem' }}>{formatDateTime(transaction.dateTime)}</td>
-                        <td>{transaction.ticker}</td>
                         <td>
-                          <span className={`ta-type-pill ${transaction.type}`}>
-                            {transaction.type.toUpperCase()}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span className={`ta-type-pill ${transaction.type}`}>
+                              {transaction.type.toUpperCase()}
+                            </span>
+                            <div>
+                              <p className="ta-holding-ticker">{transaction.ticker}</p>
+                              <p className="ta-holding-qty">{transaction.shares} shares @ {formatCurrency(transaction.price)}</p>
+                            </div>
+                          </div>
                         </td>
-                        <td>{formatCurrency(transaction.shares * transaction.price)}</td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>{formatDateTime(transaction.dateTime)}</td>
+                        <td>-</td>
+                        <td className="negative">{formatCurrency(transaction.shares * transaction.price)}</td>
                       </tr>
                     ))
                   ) : (

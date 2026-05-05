@@ -25,6 +25,7 @@ type DashboardContentProps = {
   transactions: TransactionRecord[];
   watchlist: ApiWatchlistItem[];
   onTradeAction: (trade: TradeDraft) => void;
+  onExecuteTrade: (trade: TradeDraft, shares: number) => Promise<void>;
   onAddWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onRemoveWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onPreviewNavigate: (tab: DashboardTab) => void;
@@ -39,6 +40,7 @@ export const DashboardContent = memo(function DashboardContent({
   transactions,
   watchlist,
   onTradeAction,
+  onExecuteTrade,
   onAddWatchlist,
   onRemoveWatchlist,
   onPreviewNavigate,
@@ -52,10 +54,12 @@ export const DashboardContent = memo(function DashboardContent({
         watchlist={watchlist}
         isDarkMode={isDarkMode}
         onTradeAction={onTradeAction}
+        onExecuteTrade={onExecuteTrade}
         onAddWatchlist={onAddWatchlist}
         onRemoveWatchlist={onRemoveWatchlist}
         onPreviewNavigate={onPreviewNavigate}
         priceRefreshVersion={priceRefreshVersion}
+        buyingPower={portfolioMetrics?.buyingPower}
       />
     );
   }

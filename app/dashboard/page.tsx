@@ -263,24 +263,22 @@ export default function DashboardPage() {
     }
   }, []);
 
-  const handleTradeConfirm = useCallback(
-    async (shares: number) => {
-      if (!activeTrade) {
-        return;
-      }
+  const handleExecuteTrade = useCallback(
+    async (trade: TradeDraft, shares: number) => {
+      setTradeMessage(null);
 
-      if (activeTrade.type === "sell") {
+      if (trade.type === "sell") {
         const availableShares =
-          holdings.find((holding) => holding.ticker === activeTrade.ticker)?.quantity ?? 0;
+          holdings.find((holding) => holding.ticker === trade.ticker)?.quantity ?? 0;
 
         if (shares > availableShares) {
-          setTradeMessage(`Cannot sell ${shares} shares of ${activeTrade.ticker}.`);
+          setTradeMessage(`Cannot sell ${shares} shares of ${trade.ticker}.`);
           return;
         }
       }
 
-      if (!activeTrade.exchange) {
-        setTradeMessage(`Exchange is missing for ${activeTrade.ticker}.`);
+      if (!trade.exchange) {
+        setTradeMessage(`Exchange is missing for ${trade.ticker}.`);
         return;
       }
 
@@ -293,12 +291,12 @@ export default function DashboardPage() {
       try {
         const token = await user.getIdToken();
         const request = {
-          symbol: activeTrade.ticker,
-          exchange: activeTrade.exchange,
+          symbol: trade.ticker,
+          exchange: trade.exchange,
           quantity: shares,
         };
         const tradeResult =
-          activeTrade.type === "buy"
+          trade.type === "buy"
             ? await executeBuyTrade(token, request)
             : await executeSellTrade(token, request);
 
@@ -310,7 +308,7 @@ export default function DashboardPage() {
           setTotalPortfolioValue(immediatePortfolio.totalPortfolioValue ?? INITIAL_BUYING_POWER);
           setPortfolioSnapshot(mapPortfolioMetrics(immediatePortfolio));
         }
-        if (immediateHoldings.length > 0 || activeTrade.type === "sell") {
+        if (immediateHoldings.length > 0 || trade.type === "sell") {
           setHoldings(immediateHoldings.map(mapHolding));
         }
 
@@ -331,7 +329,15 @@ export default function DashboardPage() {
         setTradeMessage(error instanceof Error ? error.message : "Trade execution failed.");
       }
     },
-    [activeTrade, holdings],
+    [holdings],
+  );
+
+  const handleTradeConfirm = useCallback(
+    async (shares: number) => {
+      if (!activeTrade) return;
+      await handleExecuteTrade(activeTrade, shares);
+    },
+    [activeTrade, handleExecuteTrade],
   );
 
   const portfolioMetrics: PortfolioMetrics = useMemo(() => {
@@ -553,6 +559,7 @@ export default function DashboardPage() {
         transactions={transactions}
         watchlist={watchlist}
         onTradeAction={handleTradeAction}
+        onExecuteTrade={handleExecuteTrade}
         onAddWatchlist={handleAddWatchlist}
         onRemoveWatchlist={handleRemoveWatchlist}
         onPreviewNavigate={handleTabChange}
