@@ -5,6 +5,7 @@ import type { PortfolioHolding } from "@/components/dashboard/portfolio-overview
 import type { TradeDraft } from "@/components/dashboard/trade-modal";
 import type { TransactionRecord } from "@/components/dashboard/transaction-history-table";
 import { searchStocks, getStockHistory, type ApiOHLCPoint, type ApiStock, type ApiWatchlistItem } from "@/lib/api";
+import type { TradeDrawerStock } from "@/components/dashboard/trade-drawer";
 
 const rangeOptions = ["1D", "5D", "1M", "6M", "YTD", "1Y"] as const;
 type RangeOption = (typeof rangeOptions)[number];
@@ -22,6 +23,7 @@ type DashboardHomeProps = {
   onAddWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onRemoveWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onPreviewNavigate: (tab: DashboardTab) => void;
+  onRowClick?: (stock: TradeDrawerStock) => void;
   priceRefreshVersion?: number;
 };
 
@@ -131,6 +133,7 @@ export const DashboardHome = memo(function DashboardHome({
   onAddWatchlist,
   onRemoveWatchlist,
   onPreviewNavigate,
+  onRowClick,
   priceRefreshVersion = 0,
 }: DashboardHomeProps) {
   const [stocks, setStocks] = useState<ApiStock[]>([]);
@@ -645,7 +648,11 @@ export const DashboardHome = memo(function DashboardHome({
                 <tbody>
                   {watchlist.length > 0 ? (
                     watchlist.slice(0, 5).map((stock) => (
-                      <tr key={`${stock.exchange}-${stock.ticker}`}>
+                      <tr
+                        key={`${stock.exchange}-${stock.ticker}`}
+                        className="ta-clickable-row"
+                        onClick={() => onRowClick?.({ ticker: stock.ticker, companyName: stock.companyName, exchange: stock.exchange, currentPrice: stock.currentPrice })}
+                      >
                         <td>{stock.ticker}</td>
                         <td>{stock.companyName}</td>
                         <td>{stock.exchange}</td>
@@ -692,7 +699,11 @@ export const DashboardHome = memo(function DashboardHome({
                       const dayGain = (holding.currentPrice ?? 0) - (holding.holdPrice ?? 0);
                       const totalPL = holding.totalPL ?? (marketValue - holdValue);
                       return (
-                        <tr key={holding.ticker}>
+                        <tr
+                          key={holding.ticker}
+                          className="ta-clickable-row"
+                          onClick={() => onRowClick?.({ ticker: holding.ticker, companyName: holding.companyName ?? holding.ticker, exchange: holding.exchange ?? "", currentPrice: holding.currentPrice })}
+                        >
                           <td>
                             <p className="ta-holding-ticker">{holding.ticker}</p>
                             <p className="ta-holding-qty">{holding.quantity ?? "--"} shares</p>
@@ -737,7 +748,11 @@ export const DashboardHome = memo(function DashboardHome({
                 <tbody>
                   {recentTransactions.length > 0 ? (
                     recentTransactions.map((transaction) => (
-                      <tr key={transaction.id}>
+                      <tr
+                        key={transaction.id}
+                        className="ta-clickable-row"
+                        onClick={() => onRowClick?.({ ticker: transaction.ticker, companyName: transaction.company, exchange: "", currentPrice: transaction.price })}
+                      >
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <span className={`ta-type-pill ${transaction.type}`}>

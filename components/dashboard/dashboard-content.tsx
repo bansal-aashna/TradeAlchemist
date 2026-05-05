@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import {
   PortfolioOverview,
   type PortfolioHolding,
@@ -16,6 +16,7 @@ import { MarketWatch } from "@/components/market-watch/market-watch";
 import { ChartsPage } from "@/components/dashboard/charts-page";
 import type { DashboardTab } from "@/components/dashboard/tabs";
 import type { ApiWatchlistItem } from "@/lib/api";
+import { TradeDrawer, type TradeDrawerStock } from "@/components/dashboard/trade-drawer";
 
 type DashboardContentProps = {
   activeTab: DashboardTab;
@@ -46,36 +47,62 @@ export const DashboardContent = memo(function DashboardContent({
   onPreviewNavigate,
   priceRefreshVersion,
 }: DashboardContentProps) {
-  if (activeTab === "Dashboard") {
-    return (
-      <DashboardHome
+  const [drawerStock, setDrawerStock] = useState<TradeDrawerStock | null>(null);
+
+  function openDrawer(stock: TradeDrawerStock) {
+    setDrawerStock(stock);
+  }
+
+  function closeDrawer() {
+    setDrawerStock(null);
+  }
+
+  // Wrap onExecuteTrade to accept TradeDraft-like signature from the drawer
+  async function handleDrawerTrade(
+    trade: { ticker: string; company: string; exchange: string; price: number; type: "buy" | "sell"; maxShares?: number },
+    shares: number
+  ) {
+    await onExecuteTrade(trade as TradeDraft, shares);
+  }
+
+  return (
+    <>
+      {/* Global Trade Drawer — rendered once, shared across all tabs */}
+      <TradeDrawer
+        stock={drawerStock}
         holdings={holdings}
-        transactions={transactions}
-        watchlist={watchlist}
-        isDarkMode={isDarkMode}
-        onTradeAction={onTradeAction}
-        onExecuteTrade={onExecuteTrade}
-        onAddWatchlist={onAddWatchlist}
-        onRemoveWatchlist={onRemoveWatchlist}
-        onPreviewNavigate={onPreviewNavigate}
-        priceRefreshVersion={priceRefreshVersion}
         buyingPower={portfolioMetrics?.buyingPower}
+        onClose={closeDrawer}
+        onExecuteTrade={handleDrawerTrade}
       />
-    );
-  }
 
-  if (activeTab === "Portfolio") {
-    return (
-      <PortfolioOverview
-        metrics={portfolioMetrics}
-        holdings={holdings}
-        onTradeAction={onTradeAction}
-      />
-    );
-  }
+      {activeTab === "Dashboard" && (
+        <DashboardHome
+          holdings={holdings}
+          transactions={transactions}
+          watchlist={watchlist}
+          isDarkMode={isDarkMode}
+          onTradeAction={onTradeAction}
+          onExecuteTrade={onExecuteTrade}
+          onAddWatchlist={onAddWatchlist}
+          onRemoveWatchlist={onRemoveWatchlist}
+          onPreviewNavigate={onPreviewNavigate}
+          onRowClick={openDrawer}
+          priceRefreshVersion={priceRefreshVersion}
+          buyingPower={portfolioMetrics?.buyingPower}
+        />
+      )}
 
-  if (activeTab === "Market Watch") {
-    return (
+      {activeTab === "Portfolio" && (
+        <PortfolioOverview
+          metrics={portfolioMetrics}
+          holdings={holdings}
+          onTradeAction={onTradeAction}
+          onRowClick={openDrawer}
+        />
+      )}
+
+      {activeTab === "Market Watch" && (
         <MarketWatch
           isDarkMode={isDarkMode}
           holdings={holdings}
@@ -84,31 +111,36 @@ export const DashboardContent = memo(function DashboardContent({
           onAddWatchlist={onAddWatchlist}
           onRemoveWatchlist={onRemoveWatchlist}
           priceRefreshVersion={priceRefreshVersion}
+          onRowClick={openDrawer}
         />
-      );
-  }
+      )}
 
-  if (activeTab === "Buy") {
-    return (
-      <BuyPage
-        holdings={holdings}
-        onTradeAction={onTradeAction}
-        priceRefreshVersion={priceRefreshVersion}
-      />
-    );
-  }
+      {activeTab === "Buy" && (
+        <BuyPage
+          holdings={holdings}
+          onTradeAction={onTradeAction}
+          priceRefreshVersion={priceRefreshVersion}
+        />
+      )}
 
-  if (activeTab === "Sell") {
-    return <SellPage holdings={holdings} onTradeAction={onTradeAction} />;
-  }
+      {activeTab === "Sell" && (
+        <SellPage
+          holdings={holdings}
+          onTradeAction={onTradeAction}
+          onRowClick={openDrawer}
+        />
+      )}
 
-  if (activeTab === "Transaction History") {
-    return <TransactionHistoryTable transactions={transactions} />;
-  }
+      {activeTab === "Transaction History" && (
+        <TransactionHistoryTable
+          transactions={transactions}
+          onRowClick={openDrawer}
+        />
+      )}
 
-  if (activeTab === "Analysis") {
-    return <ChartsPage priceRefreshVersion={priceRefreshVersion} />;
-  }
-
-  return null;
+      {activeTab === "Analysis" && (
+        <ChartsPage priceRefreshVersion={priceRefreshVersion} />
+      )}
+    </>
+  );
 });

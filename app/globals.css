@@ -198,6 +198,18 @@ body {
   color: var(--text-primary);
   /* Prevent content from hiding behind fixed bottom strip. */
   padding-bottom: calc(var(--ta-strip-height) + env(safe-area-inset-bottom));
+
+  /* Strip browser green/blue focus rings from all inputs and buttons globally */
+  accent-color: var(--accent-primary);
+}
+
+/* Remove ALL browser focus outlines on trade inputs */
+.ta-trade-shares-input:focus,
+.ta-trade-shares-input:focus-visible,
+.ta-trade-shares-input-wrap input:focus,
+.ta-trade-shares-input-wrap input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 a {
@@ -1028,10 +1040,16 @@ select:focus-visible {
 .ta-trade-shares-row {
   display: flex;
   align-items: center;
-  border: var(--border-thin) solid var(--border-primary);
+  border: var(--border-thin) solid var(--border-light);
   border-radius: 10px;
   overflow: hidden;
   background: var(--bg-primary);
+  transition: border-color var(--transition-fast);
+}
+
+.ta-trade-shares-row:focus-within {
+  border-color: var(--border-secondary);
+  outline: none;
 }
 
 .ta-trade-shares-input {
@@ -1043,6 +1061,7 @@ select:focus-visible {
   padding: 0.65rem 0.85rem;
   outline: none;
   min-width: 0;
+  accent-color: transparent;
 }
 
 .ta-trade-shares-input::-webkit-inner-spin-button,
@@ -2703,7 +2722,7 @@ button.ta-watch-result-item {
 }
 
 .ta-trade-shares-input-wrap {
-  border: var(--border-normal) solid var(--accent-secondary);
+  border: var(--border-normal) solid var(--border-light);
   border-radius: var(--radius-xl);
   padding: 4px;
   display: flex;
@@ -2776,3 +2795,110 @@ button.ta-watch-result-item {
 .ta-auth-page {
   background: #000000 !important;
 }
+
+/* ===== TRADE DRAWER ===== */
+.ta-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(3px);
+  z-index: 200;
+  transition: opacity 0.28s ease;
+  cursor: pointer;
+}
+
+.ta-trade-drawer {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translate(-50%, 100%);
+  width: min(560px, 100%);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-primary);
+  border-bottom: none;
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+  padding: 1.5rem 2rem 2.5rem;
+  z-index: 201;
+  transition: transform 0.3s cubic-bezier(0.34, 1.1, 0.64, 1);
+  box-shadow: 0 -8px 48px rgba(0, 0, 0, 0.35);
+}
+
+.ta-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 1.25rem;
+}
+
+.ta-drawer-handle {
+  width: 42px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-light);
+}
+
+.ta-drawer-close {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast);
+  line-height: 1;
+}
+
+.ta-drawer-close:hover {
+  color: var(--text-primary);
+}
+
+.ta-drawer-stock-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.ta-drawer-exchange {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.ta-drawer-msg {
+  margin-top: 0.85rem;
+  font-size: var(--text-sm);
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+}
+
+.ta-drawer-msg.success {
+  background: color-mix(in srgb, var(--accent-secondary) 12%, transparent);
+  color: var(--accent-secondary);
+  border: 1px solid color-mix(in srgb, var(--accent-secondary) 30%, transparent);
+}
+
+.ta-drawer-msg.error {
+  background: color-mix(in srgb, var(--danger-primary) 12%, transparent);
+  color: var(--danger-primary);
+  border: 1px solid color-mix(in srgb, var(--danger-primary) 30%, transparent);
+}
+
+/* Clickable table rows that open the drawer */
+.ta-clickable-row {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.ta-clickable-row:hover {
+  background: color-mix(in srgb, var(--border-light) 40%, transparent);
+}
+

@@ -1,4 +1,5 @@
 import { memo } from "react";
+import type { TradeDrawerStock } from "@/components/dashboard/trade-drawer";
 
 export type TransactionType = "buy" | "sell";
 
@@ -15,6 +16,7 @@ export type TransactionRecord = {
 
 type TransactionHistoryTableProps = {
   transactions: TransactionRecord[];
+  onRowClick?: (stock: TradeDrawerStock) => void;
 };
 
 function formatDateTime(value: string) {
@@ -41,6 +43,7 @@ function formatCurrency(value: number) {
 
 export const TransactionHistoryTable = memo(function TransactionHistoryTable({
   transactions,
+  onRowClick,
 }: TransactionHistoryTableProps) {
   return (
     <section className="ta-dashboard-content">
@@ -65,7 +68,11 @@ export const TransactionHistoryTable = memo(function TransactionHistoryTable({
                 const totalValue = transaction.shares * transaction.price;
 
                 return (
-                  <tr key={transaction.id}>
+                  <tr
+                    key={transaction.id}
+                    className="ta-clickable-row"
+                    onClick={() => onRowClick?.({ ticker: transaction.ticker, companyName: transaction.company, exchange: "", currentPrice: transaction.price })}
+                  >
                     <td>{formatDateTime(transaction.dateTime)}</td>
                     <td>{transaction.ticker}</td>
                     <td>{transaction.company}</td>

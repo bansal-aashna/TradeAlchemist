@@ -1,10 +1,12 @@
 import { memo } from "react";
 import type { PortfolioHolding } from "@/components/dashboard/portfolio-overview";
 import type { TradeDraft } from "@/components/dashboard/trade-modal";
+import type { TradeDrawerStock } from "@/components/dashboard/trade-drawer";
 
 type SellPageProps = {
   holdings?: PortfolioHolding[];
   onTradeAction: (trade: TradeDraft) => void;
+  onRowClick?: (stock: TradeDrawerStock) => void;
 };
 
 function formatCurrency(value: number | undefined) {
@@ -25,7 +27,7 @@ function getValueTone(value: number | undefined) {
   return value > 0 ? "positive" : "negative";
 }
 
-export const SellPage = memo(function SellPage({ holdings, onTradeAction }: SellPageProps) {
+export const SellPage = memo(function SellPage({ holdings, onTradeAction, onRowClick }: SellPageProps) {
   return (
     <section className="ta-dashboard-content ta-sell-page">
       <h2 className="ta-holdings-title">Sell</h2>
@@ -49,7 +51,11 @@ export const SellPage = memo(function SellPage({ holdings, onTradeAction }: Sell
                 const canSell = Boolean(holding.currentPrice) && Boolean(holding.quantity);
 
                 return (
-                  <tr key={holding.ticker}>
+                  <tr
+                    key={holding.ticker}
+                    className="ta-clickable-row"
+                    onClick={() => onRowClick?.({ ticker: holding.ticker, companyName: holding.companyName ?? holding.ticker, exchange: holding.exchange ?? "", currentPrice: holding.currentPrice })}
+                  >
                     <td>
                       <p className="ta-holding-ticker">{holding.ticker}</p>
                       <p className="ta-holding-qty">Qty: {holding.quantity ?? "--"}</p>

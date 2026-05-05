@@ -1,5 +1,6 @@
 import { memo } from "react";
 import type { TradeDraft } from "@/components/dashboard/trade-modal";
+import type { TradeDrawerStock } from "@/components/dashboard/trade-drawer";
 
 export type PortfolioMetrics = {
   totalPortfolioValue?: number;
@@ -24,6 +25,7 @@ type PortfolioOverviewProps = {
   metrics?: PortfolioMetrics;
   holdings?: PortfolioHolding[];
   onTradeAction: (trade: TradeDraft) => void;
+  onRowClick?: (stock: TradeDrawerStock) => void;
 };
 
 const portfolioFields: Array<{ key: keyof PortfolioMetrics; label: string }> = [
@@ -59,6 +61,7 @@ export const PortfolioOverview = memo(function PortfolioOverview({
   metrics,
   holdings,
   onTradeAction,
+  onRowClick,
 }: PortfolioOverviewProps) {
   return (
     <section className="ta-dashboard-content">
@@ -97,7 +100,11 @@ export const PortfolioOverview = memo(function PortfolioOverview({
                 holdings.map((holding) => {
                   const plTone = getValueTone(holding.totalPL);
                   return (
-                    <tr key={holding.ticker}>
+                      <tr
+                        key={holding.ticker}
+                        className="ta-clickable-row"
+                        onClick={() => onRowClick?.({ ticker: holding.ticker, companyName: holding.companyName ?? holding.ticker, exchange: holding.exchange ?? "", currentPrice: holding.currentPrice })}
+                      >
                       <td>
                         <p className="ta-holding-ticker">{holding.ticker}</p>
                         <p className="ta-holding-qty">Qty: {holding.quantity ?? "--"}</p>

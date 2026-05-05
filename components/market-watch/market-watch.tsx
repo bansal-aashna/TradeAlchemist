@@ -5,6 +5,7 @@ import type { TradeDraft } from "@/components/dashboard/trade-modal";
 import type { PortfolioHolding } from "@/components/dashboard/portfolio-overview";
 import { searchStocks, type ApiStock, type ApiWatchlistItem } from "@/lib/api";
 import { EXCHANGE_OPTIONS, type ExchangeId } from "@/lib/exchanges";
+import type { TradeDrawerStock } from "@/components/dashboard/trade-drawer";
 
 type MarketWatchProps = {
   isDarkMode: boolean;
@@ -14,6 +15,7 @@ type MarketWatchProps = {
   onAddWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onRemoveWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   priceRefreshVersion?: number;
+  onRowClick?: (stock: TradeDrawerStock) => void;
 };
 
 export const MarketWatch = memo(function MarketWatch({
@@ -24,6 +26,7 @@ export const MarketWatch = memo(function MarketWatch({
   onAddWatchlist,
   onRemoveWatchlist,
   priceRefreshVersion = 0,
+  onRowClick,
 }: MarketWatchProps) {
   const [selectedExchange, setSelectedExchange] = useState<ExchangeId>("NSE");
   const [query, setQuery] = useState("");
@@ -184,7 +187,15 @@ export const MarketWatch = memo(function MarketWatch({
                   const canSell = availableShares > 0;
 
                   return (
-                  <tr key={`${stock.exchange}-${stock.ticker}`}>
+                  <tr
+                    key={`${stock.exchange}-${stock.ticker}`}
+                    className="ta-clickable-row"
+                    onClick={(e) => {
+                      // Don't open drawer when clicking action buttons
+                      if ((e.target as HTMLElement).closest('button')) return;
+                      onRowClick?.({ ticker: stock.ticker, companyName: stock.companyName, exchange: stock.exchange, currentPrice: stock.currentPrice });
+                    }}
+                  >
                     <td>{stock.ticker}</td>
                     <td>{stock.companyName}</td>
                     <td>{stock.exchange}</td>
