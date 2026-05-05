@@ -23,13 +23,18 @@ export const DashboardTopbar = memo(function DashboardTopbar({
   return (
     <header className="ta-topbar">
       <div className="ta-topbar-left">
-        <div className="ta-brand">
+        <button
+          type="button"
+          className="ta-brand ta-brand-btn"
+          onClick={() => onTabChange("Dashboard")}
+          aria-label="Go to Dashboard"
+        >
           <img
             src={isDarkMode ? "/logo-dark.png" : "/logo-light.png"}
             alt="TradeAlchemist Logo"
           />
           <h1 className="ta-app-name">TradeAlchemist</h1>
-        </div>
+        </button>
 
         <DashboardTabsNav activeTab={activeTab} onTabChange={onTabChange} />
       </div>

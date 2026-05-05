@@ -649,12 +649,24 @@ select:focus-visible {
   gap: var(--space-sm);
 }
 
+.ta-brand-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  transition: opacity var(--transition-fast);
+}
+
+.ta-brand-btn:hover {
+  opacity: 0.8;
+}
+
 .ta-brand img {
   height: 40px;
   width: auto;
   object-fit: contain;
 }
-
 
 /* ===== TOPBAR ===== */
 .ta-topbar {
