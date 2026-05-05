@@ -153,6 +153,7 @@ export type ApiTransaction = {
   price: number;
   totalValue?: number;
   dateTime: string;
+  realisedPL?: number;
 };
 
 export type ExecuteTradeRequest = {
@@ -458,6 +459,7 @@ function normalizeTransactionItem(item: Record<string, unknown>): ApiTransaction
       asNumber(item.totalValue) ??
       asNumber(item.total_value) ??
       shares * price,
+    realisedPL: asNumber(item.realisedPL) ?? asNumber(item.profit) ?? asNumber(item.pl),
     dateTime,
   };
 }

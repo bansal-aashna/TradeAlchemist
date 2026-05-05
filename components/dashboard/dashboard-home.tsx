@@ -6,7 +6,7 @@ import type { TradeDraft } from "@/components/dashboard/trade-modal";
 import type { TransactionRecord } from "@/components/dashboard/transaction-history-table";
 import { searchStocks, getStockHistory, type ApiOHLCPoint, type ApiStock, type ApiWatchlistItem } from "@/lib/api";
 
-const rangeOptions = ["1D", "5D", "1M", "6M", "YTD", "1Y", "5Y"] as const;
+const rangeOptions = ["1D", "5D", "1M", "6M", "YTD", "1Y"] as const;
 type RangeOption = (typeof rangeOptions)[number];
 import { EXCHANGE_OPTIONS, type ExchangeId } from "@/lib/exchanges";
 import type { DashboardTab } from "@/components/dashboard/tabs";
@@ -381,7 +381,17 @@ export const DashboardHome = memo(function DashboardHome({
             <article className="ta-dashboard-section-card" style={{ padding: '1.25rem' }}>
               <div className="ta-buy-selected-card ta-dashboard-selected-row" style={{ marginTop: 0, paddingBottom: '1rem', borderBottom: '1px solid var(--border-secondary)' }}>
                 <div>
-                  <p className="ta-buy-selected-symbol">{selectedStock.symbol}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <p className="ta-buy-selected-symbol">{selectedStock.symbol}</p>
+                    <button
+                      type="button"
+                      className="ta-add-watchlist-icon"
+                      title="Add to Watchlist"
+                      onClick={() => onAddWatchlist({ ticker: selectedStock.symbol, companyName: selectedStock.companyName, exchange: selectedStock.exchange })}
+                    >
+                      +
+                    </button>
+                  </div>
                   <p className="ta-buy-selected-company">{selectedStock.companyName}</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
@@ -476,7 +486,7 @@ export const DashboardHome = memo(function DashboardHome({
             {/* Trade Column */}
             <article className="ta-dashboard-section-card ta-trade-card">
               <h3 className="ta-holdings-title">Trade {selectedStock.symbol}</h3>
-              <p className="ta-holdings-subtitle">Place buy or sell orders for this stock.</p>
+              
 
               {/* Buy / Sell segmented control */}
               <div className="ta-trade-seg-wrap">
@@ -567,14 +577,7 @@ export const DashboardHome = memo(function DashboardHome({
                 {isTrading ? 'Processing...' : (tradeMode === 'buy' ? 'Place Buy Order' : 'Place Sell Order')}
               </button>
 
-              {/* Add to watchlist */}
-              <button
-                type="button"
-                className="ta-trade-watchlist-btn"
-                onClick={() => onAddWatchlist({ ticker: selectedStock.symbol, companyName: selectedStock.companyName, exchange: selectedStock.exchange })}
-              >
-                + Add to Watchlist
-              </button>
+              {/* Add to watchlist moved */}
             </article>
           </div>
         ) : (
@@ -628,7 +631,7 @@ export const DashboardHome = memo(function DashboardHome({
             >
               <h3 className="ta-holdings-title">Watchlist</h3>
             </button>
-            <p className="ta-holdings-subtitle">Stocks you are watching.</p>
+            
             <div className="ta-holdings-table-wrap">
               <table className="ta-holdings-table">
                 <thead>
@@ -668,9 +671,9 @@ export const DashboardHome = memo(function DashboardHome({
               className="ta-preview-link"
               onClick={() => onPreviewNavigate("Portfolio")}
             >
-              <h3 className="ta-holdings-title">Holdings</h3>
+              <h3 className="ta-holdings-title">All Holdings</h3>
             </button>
-            <p className="ta-holdings-subtitle">A summary of your major stock holdings.</p>
+            
             <div className="ta-holdings-table-wrap">
               <table className="ta-holdings-table">
                 <thead>
@@ -720,7 +723,7 @@ export const DashboardHome = memo(function DashboardHome({
             >
               <h3 className="ta-holdings-title">Recent Transactions</h3>
             </button>
-            <p className="ta-holdings-subtitle">Your 5 most recent trades.</p>
+           
             <div className="ta-holdings-table-wrap">
               <table className="ta-holdings-table">
                 <thead>
@@ -747,8 +750,12 @@ export const DashboardHome = memo(function DashboardHome({
                           </div>
                         </td>
                         <td style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>{formatDateTime(transaction.dateTime)}</td>
-                        <td>-</td>
-                        <td className="negative">{formatCurrency(transaction.shares * transaction.price)}</td>
+                        <td className={`ta-portfolio-value ${transaction.realisedPL !== undefined && transaction.realisedPL !== 0 ? (transaction.realisedPL > 0 ? 'positive' : 'negative') : 'neutral'}`}>
+                          {transaction.type === 'buy' ? '--' : (transaction.realisedPL !== undefined ? formatCurrency(transaction.realisedPL) : '--')}
+                        </td>
+                        <td className={transaction.type === 'buy' ? 'negative' : 'positive'}>
+                          {transaction.type === 'buy' ? '-' : '+'}{formatCurrency(transaction.shares * transaction.price)}
+                        </td>
                       </tr>
                     ))
                   ) : (

@@ -3,7 +3,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { getStockHistory, searchStocks, type ApiOHLCPoint, type ApiStock } from "@/lib/api";
 import { EXCHANGE_OPTIONS, type ExchangeId } from "@/lib/exchanges";
-const rangeOptions = ["1D", "5D", "1M", "6M", "YTD", "1Y", "5Y"] as const;
+const rangeOptions = ["1D", "5D", "1M", "6M", "YTD", "1Y"] as const;
 type RangeOption = (typeof rangeOptions)[number];
 const CHART_WIDTH = 980;
 const CHART_HEIGHT = 182;
@@ -112,7 +112,7 @@ export const ChartsPage = memo(function ChartsPage({
   );
   const [query, setQuery] = useState("");
   const [selectedSymbol, setSelectedSymbol] = useState("");
-  const [activeRange, setActiveRange] = useState<RangeOption>("5Y");
+  const [activeRange, setActiveRange] = useState<RangeOption>("1Y");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [historySeries, setHistorySeries] = useState<ApiOHLCPoint[]>([]);
   const [isLoadingStocks, setIsLoadingStocks] = useState(false);
@@ -364,7 +364,7 @@ export const ChartsPage = memo(function ChartsPage({
           <p className={`ta-charts-change ${tone}`}>
             {diff >= 0 ? "+" : ""}
             {diff.toFixed(2)} ({diffPct.toFixed(2)}%) {diff >= 0 ? "▲" : "▼"} past{" "}
-            {activeRange === "5Y" ? "5 years" : activeRange}
+            {activeRange === "1Y" ? "1 year" : activeRange}
           </p>
 
           <div className="ta-charts-ranges">

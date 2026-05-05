@@ -28,7 +28,7 @@ function getValueTone(value: number | undefined) {
 export const SellPage = memo(function SellPage({ holdings, onTradeAction }: SellPageProps) {
   return (
     <section className="ta-dashboard-content ta-sell-page">
-      <h2>Sell</h2>
+      <h2 className="ta-holdings-title">Sell</h2>
 
       <div className="ta-holdings-table-wrap">
         <table className="ta-holdings-table">

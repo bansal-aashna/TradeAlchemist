@@ -62,7 +62,52 @@ function mapTransaction(
     type: transaction.type,
     shares: transaction.shares,
     price: transaction.price,
+    realisedPL: transaction.realisedPL,
   };
+}
+
+function processTransactions(rawTxs: TransactionRecord[]): TransactionRecord[] {
+  // Sort ascending by date to process chronologically
+  const sorted = [...rawTxs].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
+  
+  // Track cost basis: { [ticker]: { shares: number, totalCost: number } }
+  const inventory: Record<string, { shares: number, totalCost: number }> = {};
+  
+  for (const tx of sorted) {
+    if (!inventory[tx.ticker]) {
+      inventory[tx.ticker] = { shares: 0, totalCost: 0 };
+    }
+    const inv = inventory[tx.ticker];
+    
+    if (tx.type === "buy") {
+      inv.shares += tx.shares;
+      inv.totalCost += tx.shares * tx.price;
+    } else if (tx.type === "sell") {
+      // Calculate PL if the backend hasn't provided it
+      if (tx.realisedPL === undefined || isNaN(tx.realisedPL)) {
+        if (inv.shares > 0) {
+          const avgCost = inv.totalCost / inv.shares;
+          tx.realisedPL = (tx.price - avgCost) * tx.shares;
+        } else {
+          tx.realisedPL = 0; // Short selling not supported, assume 0 PL
+        }
+      }
+      
+      // Update inventory
+      if (inv.shares > 0) {
+        const avgCost = inv.totalCost / inv.shares;
+        inv.shares -= tx.shares;
+        inv.totalCost -= avgCost * tx.shares;
+        if (inv.shares <= 0) {
+          inv.shares = 0;
+          inv.totalCost = 0;
+        }
+      }
+    }
+  }
+  
+  // Sort back to descending (most recent first)
+  return sorted.sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 }
 
 function mapPortfolioMetrics(portfolio: ApiPortfolio | null | undefined): PortfolioMetrics | null {
@@ -318,7 +363,7 @@ export default function DashboardPage() {
           getTransactions(token),
         ]);
 
-        setTransactions(transactionsData.map(mapTransaction));
+        setTransactions(processTransactions(transactionsData.map(mapTransaction)));
         setHoldings(holdingsData.map(mapHolding));
         setBuyingPower(portfolio?.buyingPower ?? INITIAL_BUYING_POWER);
         setTotalPortfolioValue(portfolio?.totalPortfolioValue ?? INITIAL_BUYING_POWER);
@@ -433,7 +478,7 @@ export default function DashboardPage() {
         setHoldings(holdingsData.status === "fulfilled" ? holdingsData.value.map(mapHolding) : []);
         setTransactions(
           transactionsData.status === "fulfilled"
-            ? transactionsData.value.map(mapTransaction)
+            ? processTransactions(transactionsData.value.map(mapTransaction))
             : [],
         );
         setWatchlist(watchlistData.status === "fulfilled" ? watchlistData.value : []);

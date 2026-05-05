@@ -10,6 +10,7 @@ export type TransactionRecord = {
   type: TransactionType;
   shares: number;
   price: number;
+  realisedPL?: number;
 };
 
 type TransactionHistoryTableProps = {
@@ -43,7 +44,7 @@ export const TransactionHistoryTable = memo(function TransactionHistoryTable({
 }: TransactionHistoryTableProps) {
   return (
     <section className="ta-dashboard-content">
-      <h2>Transaction History</h2>
+      <h2 className="ta-holdings-title">Transaction History</h2>
       <div className="ta-holdings-table-wrap">
         <table className="ta-holdings-table">
           <thead>
@@ -55,6 +56,7 @@ export const TransactionHistoryTable = memo(function TransactionHistoryTable({
               <th>Shares</th>
               <th>Price</th>
               <th>Total Value</th>
+              <th>Profit / Loss</th>
             </tr>
           </thead>
           <tbody>
@@ -75,12 +77,15 @@ export const TransactionHistoryTable = memo(function TransactionHistoryTable({
                     <td>{transaction.shares}</td>
                     <td>{formatCurrency(transaction.price)}</td>
                     <td>{formatCurrency(totalValue)}</td>
+                    <td className={`ta-portfolio-value ${transaction.realisedPL !== undefined && transaction.realisedPL !== 0 ? (transaction.realisedPL > 0 ? 'positive' : 'negative') : 'neutral'}`}>
+                      {transaction.type === 'buy' ? '--' : (transaction.realisedPL !== undefined ? formatCurrency(transaction.realisedPL) : '--')}
+                    </td>
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={7} className="ta-holdings-empty">
+                <td colSpan={8} className="ta-holdings-empty">
                   No transactions available.
                 </td>
               </tr>

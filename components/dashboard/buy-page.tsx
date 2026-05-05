@@ -5,7 +5,7 @@ import type { TradeDraft } from "@/components/dashboard/trade-modal";
 import type { PortfolioHolding } from "@/components/dashboard/portfolio-overview";
 import { getStockHistory, searchStocks, type ApiOHLCPoint, type ApiStock } from "@/lib/api";
 import { EXCHANGE_OPTIONS, type ExchangeId } from "@/lib/exchanges";
-const rangeOptions = ["1D", "5D", "1M", "6M", "YTD", "1Y", "5Y"] as const;
+const rangeOptions = ["1D", "5D", "1M", "6M", "YTD", "1Y"] as const;
 type RangeOption = (typeof rangeOptions)[number];
 
 type BuyPageProps = {
@@ -358,7 +358,7 @@ export const BuyPage = memo(function BuyPage({
             <p className={`ta-charts-change ${tone}`}>
               {diff >= 0 ? "+" : ""}
               {diff.toFixed(2)} ({diffPct.toFixed(2)}%) {diff >= 0 ? "▲" : "▼"} past{" "}
-              {activeRange === "5Y" ? "5 years" : activeRange}
+              {activeRange === "1Y" ? "1 year" : activeRange}
             </p>
             <div className="ta-buy-chart-placeholder">
               {selectedStock ? (

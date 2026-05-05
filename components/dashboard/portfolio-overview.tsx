@@ -62,7 +62,7 @@ export const PortfolioOverview = memo(function PortfolioOverview({
 }: PortfolioOverviewProps) {
   return (
     <section className="ta-dashboard-content">
-      <h2>Portfolio</h2>
+      <h2 className="ta-holdings-title">Portfolio</h2>
 
       <div className="ta-portfolio-grid">
         {portfolioFields.map((field) => {
