@@ -554,7 +554,12 @@ export const DashboardHome = memo(function DashboardHome({
               <button
                 type="button"
                 className={`ta-trade-cta-btn ${tradeMode}`}
-                disabled={isTrading || !selectedStock.currentPrice || Number(shares) <= 0 || (tradeMode === 'sell' && !(holdings?.find(h => h.ticker === selectedStock.symbol)?.quantity))}
+                disabled={
+                  isTrading ||
+                  !selectedStock.currentPrice ||
+                  Number(shares) <= 0 ||
+                  (tradeMode === 'sell' && Number(shares) > (holdings?.find(h => h.ticker === selectedStock.symbol)?.quantity ?? 0))
+                }
                 onClick={async () => {
                   if (isTrading || !selectedStock.currentPrice || !onExecuteTrade) return;
                   const qty = Number(shares);

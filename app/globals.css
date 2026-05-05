@@ -2305,6 +2305,10 @@ button.ta-watch-result-item {
   color: var(--danger-primary);
 }
 
+.ta-portfolio-value.neutral {
+  color: var(--text-primary);
+}
+
 /* ===== HOLDINGS TABLE ===== */
 .ta-holdings-wrap {
   margin-top: 0.8rem;

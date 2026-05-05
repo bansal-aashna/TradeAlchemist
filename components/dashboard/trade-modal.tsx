@@ -135,7 +135,7 @@ export function TradeModal({ trade, onCancel, onConfirm, message }: TradeModalPr
             type="button"
             className={`ta-trade-submit-btn ta-trade-pill ${trade.type}`}
             onClick={handleConfirm}
-            disabled={safeShares < 1 || isSubmitting}
+            disabled={safeShares < 1 || isSubmitting || (trade.type === "sell" && trade.maxShares !== undefined && safeShares > trade.maxShares)}
           >
             {isSubmitting
               ? "Processing..."

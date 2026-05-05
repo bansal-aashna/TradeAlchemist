@@ -52,12 +52,12 @@ export const DashboardTopbar = memo(function DashboardTopbar({
           />
         </button>
 
+        {userName ? <p className="ta-topbar-greeting">Hi, {userName}</p> : null}
+
         <ProfileMenu
           onLogout={onLogout}
           isDarkMode={isDarkMode}
         />
-
-        {userName ? <p className="ta-topbar-greeting">Hi, {userName}</p> : null}
       </div>
     </header>
   );

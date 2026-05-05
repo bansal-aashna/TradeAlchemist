@@ -103,7 +103,10 @@ export const PortfolioOverview = memo(function PortfolioOverview({
                       <tr
                         key={holding.ticker}
                         className="ta-clickable-row"
-                        onClick={() => onRowClick?.({ ticker: holding.ticker, companyName: holding.companyName ?? holding.ticker, exchange: holding.exchange ?? "", currentPrice: holding.currentPrice })}
+                        onClick={(e) => {
+                          if ((e.target as HTMLElement).closest('button')) return;
+                          onRowClick?.({ ticker: holding.ticker, companyName: holding.companyName ?? holding.ticker, exchange: holding.exchange ?? "", currentPrice: holding.currentPrice });
+                        }}
                       >
                       <td>
                         <p className="ta-holding-ticker">{holding.ticker}</p>
