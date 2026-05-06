@@ -51,12 +51,12 @@
   /* Bottom strip text */
 
   /* Border tokens used on cards, form fields, table cells, strip separators. */
-  --border-primary: #2d3544;
-  --border-secondary: #7e828c;
-  /* Unified search bar border — very dark grey, used on all search inputs & selects */
-  --search-border: #2a2d35;
-  --border-muted: rgba(127, 127, 127, 0.2);
   --border-light: rgba(127, 127, 127, 0.3);
+  --border-primary: rgba(127, 127, 127, 0.3);
+  --border-secondary: rgba(127, 127, 127, 0.3);
+  /* Unified search bar border — soft light grey, used on all search inputs & selects */
+  --search-border: rgba(127, 127, 127, 0.3);
+  --border-muted: rgba(127, 127, 127, 0.3);
   --border-strip: rgba(127, 127, 127, 0.3);
 
   /* Accent tokens for buy/profit/active states. */
@@ -91,7 +91,7 @@
 
   /* Standard border thickness tokens. */
   --border-thin: 1px;
-  --border-normal: 2px;
+  --border-normal: 1px;
 
   /* Typography scale used across headings, labels, values, and tables. */
   --text-xs: 0.85rem;
@@ -140,10 +140,11 @@ html[data-theme="light"] {
   --text-strip: #141414;
   /* Light mode strip text */
 
-  --border-primary: #636466;
-  --border-secondary: #7e828c;
-  --border-muted: #eef0f2;
   --border-light: rgba(0, 0, 0, 0.12);
+  --border-primary: rgba(0, 0, 0, 0.12);
+  --border-secondary: rgba(0, 0, 0, 0.12);
+  --border-muted: rgba(0, 0, 0, 0.12);
+  --search-border: rgba(0, 0, 0, 0.12);
   --border-strip: rgba(127, 127, 127, 0.3);
 
   --icon-primary: #667083;
@@ -165,10 +166,11 @@ html[data-theme="light"] {
   --text-disabled: #9aa4b6;
   --text-topbar: #141414;
 
-  --border-primary: #636466;
-  --border-secondary: #7e828c;
-  --border-muted: #eef0f2;
+  --border-primary: rgba(0, 0, 0, 0.12);
+  --border-secondary: rgba(0, 0, 0, 0.12);
+  --border-muted: rgba(0, 0, 0, 0.12);
   --border-light: rgba(0, 0, 0, 0.12);
+  --search-border: rgba(0, 0, 0, 0.12);
 
   --icon-primary: #667083;
   --icon-secondary: #ebedef;
@@ -285,7 +287,7 @@ a {
 
 .ta-card {
   width: min(100%, 520px);
-  border: var(--border-thin) solid var(--accent-primary);
+  border: var(--border-thin) solid var(--border-light);
   background: var(--bg-elevated);
   border-radius: var(--radius-2xl);
   padding: var(--space-2xl);
@@ -340,7 +342,7 @@ a {
 
 .ta-input {
   width: 100%;
-  border: var(--border-thin) solid var(--accent-primary);
+  border: var(--border-thin) solid var(--border-light);
   background: var(--bg-elevated);
   color: var(--text-primary);
   border-radius: var(--radius-md);
@@ -353,7 +355,7 @@ a {
 }
 
 .ta-input:focus {
-  border-color: var(--accent-primary);
+  border-color: var(--border-light);
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.16);
 }
 
@@ -441,7 +443,7 @@ select:focus-visible {
 .ta-auth-card {
   width: min(100%, 500px);
   min-height: auto; /* Removed 550px fixed height for better balance */
-  border: 1px solid rgba(30, 31, 31, 0.85);
+  border: var(--border-thin) solid var(--border-light);
   background: #111111;
   border-radius: 14px;
   padding: 1.75rem 2.5rem 1.6rem;
@@ -499,7 +501,7 @@ select:focus-visible {
 .ta-auth-page .ta-input {
   margin-top: 0;
   min-height: 42px;
-  border: 1px solid #2f3642;
+  border: var(--border-thin) solid var(--border-light);
   background: #0c0c0c;
   border-radius: 10px;
   padding: 0 0.9rem;
@@ -512,7 +514,7 @@ select:focus-visible {
 }
 
 .ta-auth-page .ta-input:focus {
-  border-color: #2f3642;
+  border-color: var(--border-light);
   box-shadow: 0 0 0 1px rgba(33, 185, 84, 0.22);
 }
 
@@ -543,7 +545,7 @@ select:focus-visible {
 .ta-auth-check-box {
   width: 22px;
   height: 22px;
-  border: 1.5px solid var(--accent-primary);
+  border: var(--border-thin) solid var(--border-light);
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
@@ -628,7 +630,7 @@ select:focus-visible {
 
 .ta-select {
   width: 100%;
-  border: var(--border-normal) solid var(--border-secondary);
+  border: var(--border-thin) solid var(--border-light);
   border-radius: var(--radius-md);
   padding: var(--space-md) var(--space-md);
   background: var(--bg-elevated);
@@ -653,7 +655,7 @@ select:focus-visible {
 
 .ta-dashboard-placeholder {
   width: min(100%, 640px);
-  border: var(--border-thin) solid var(--accent-primary);
+  border: var(--border-thin) solid var(--border-light);
   border-radius: var(--radius-2xl);
   background: var(--bg-tertiary);
   padding: var(--space-2xl);
@@ -974,6 +976,63 @@ select:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--accent-secondary) 70%, #7ad9a3 30%);
   outline-offset: 4px;
   border-radius: var(--radius-sm);
+}
+
+.ta-stock-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: fit-content;
+  margin: 0;
+  padding: 0.12rem 0.42rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, font-weight 150ms ease,
+    transform 150ms ease;
+}
+
+.ta-stock-link:hover,
+.ta-stock-link:focus-visible {
+  background: color-mix(in srgb, var(--border-secondary) 28%, var(--bg-tertiary) 72%);
+  color: var(--text-primary);
+  font-weight: 700;
+  outline: none;
+}
+
+.ta-stock-link:active {
+  background: color-mix(in srgb, var(--border-secondary) 38%, var(--bg-tertiary) 62%);
+  color: var(--text-primary);
+  font-weight: 700;
+  transform: translateY(1px);
+}
+
+.ta-stock-link:hover .ta-holding-ticker,
+.ta-stock-link:focus-visible .ta-holding-ticker,
+.ta-stock-link:active .ta-holding-ticker {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.ta-stock-link-muted {
+  color: var(--text-secondary);
+}
+
+.ta-stock-link-heading {
+  padding-inline: 0.25rem;
+}
+
+.ta-stock-result-link {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.22rem;
 }
 
 .ta-dashboard-section-card {
@@ -1357,7 +1416,7 @@ select:focus-visible {
 .ta-charts-tooltip {
   position: absolute;
   background: color-mix(in srgb, var(--bg-elevated) 92%, var(--bg-secondary) 8%);
-  border: 1px solid color-mix(in srgb, var(--border-muted) 82%, rgba(255, 255, 255, 0.08) 18%);
+  border: var(--border-thin) solid var(--border-light);
   border-radius: 8px;
   font-size: 0.75rem;
   color: var(--text-primary);
@@ -1587,12 +1646,12 @@ select:focus-visible {
 }
 
 .ta-buy-select:hover {
-  border-color: #3e424f;
+  border-color: var(--search-border);
 }
 
 .ta-buy-select:focus {
   outline: none;
-  border-color: #4a4f5e;
+  border-color: var(--search-border);
 }
 
 .ta-buy-select option {
@@ -1626,12 +1685,12 @@ select:focus-visible {
 
 .ta-buy-search-input-wrap:hover,
 .ta-watch-search-input-wrap:hover {
-  border-color: #3e424f;
+  border-color: var(--search-border);
 }
 
 .ta-buy-search-input-wrap:focus-within,
 .ta-watch-search-input-wrap:focus-within {
-  border-color: #4a4f5e;
+  border-color: var(--search-border);
 }
 
 /* Text input inside the wrapper */
@@ -1882,11 +1941,6 @@ select:focus-visible {
   grid-template-columns: 1fr 1fr;
 }
 
-.ta-buy-action-btn {
-  border: 0;
-  cursor: pointer;
-}
-
 /* ----- Key Statistics grid (Buy page side panel) ----- */
 .ta-buy-stats-grid {
   display: grid;
@@ -2090,7 +2144,7 @@ select:focus-visible {
 /* Market-watch also has its own old panel (unused in new layout) */
 .ta-watch-search-panel {
   margin-top: var(--space-sm);
-  border: 1px solid var(--search-border);
+  border: var(--border-thin) solid var(--border-light);
   border-radius: var(--radius-xl);
   display: grid;
   grid-template-columns: 220px 1fr;
@@ -2131,18 +2185,6 @@ button.ta-watch-result-item {
   background: var(--border-light);
 }
 
-.ta-watch-preview-symbol {
-  font-size: var(--text-2xl);
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.ta-watch-preview-name {
-  margin-top: 2px;
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
 /* Exchange badge shown on the right of each result row */
 .ta-watch-result-exchange {
   flex-shrink: 0;
@@ -2169,14 +2211,16 @@ button.ta-watch-result-item {
 }
 
 .ta-watch-preview-symbol {
-  font-size: var(--text-2xl);
-  font-weight: 600;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .ta-watch-preview-name {
-  margin-top: var(--space-xs);
+  margin-top: 0.15rem;
   color: var(--text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
+  font-weight: 500;
 }
 
 .ta-watch-add-btn {
@@ -2360,6 +2404,11 @@ button.ta-watch-result-item {
   border-bottom: var(--border-thin) solid var(--border-light);
 }
 
+.ta-holdings-table thead th.ta-th-light {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
 .ta-holdings-table tbody tr:last-child td {
   border-bottom: none;
 }
@@ -2379,14 +2428,23 @@ button.ta-watch-result-item {
 }
 
 .ta-holding-ticker {
-  font-weight: 600;
-  font-size: var(--text-lg);
+  font-weight: 700;
+  font-size: var(--text-xl);
 }
 
 .ta-holding-qty {
   margin-top: 0.15rem;
   font-size: var(--text-sm);
   color: var(--text-muted);
+}
+
+
+
+.ta-stock-company {
+  margin-top: 0.15rem;
+  font-size: var(--text-md);
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
 .ta-holdings-empty {
@@ -2498,10 +2556,11 @@ button.ta-watch-result-item {
     --text-topbar: #141414;
     --text-strip: #141414;
 
-    --border-primary: #636466;
-    --border-secondary: #7e828c;
-    --border-muted: #eef0f2;
+    --border-primary: rgba(0, 0, 0, 0.12);
+    --border-secondary: rgba(0, 0, 0, 0.12);
+    --border-muted: rgba(0, 0, 0, 0.12);
     --border-light: rgba(0, 0, 0, 0.12);
+    --search-border: rgba(0, 0, 0, 0.12);
     --border-strip: rgba(127, 127, 127, 0.3);
 
     --icon-primary: #667083;
@@ -2684,7 +2743,7 @@ button.ta-watch-result-item {
 
 .ta-trade-modal {
   width: min(100%, 860px);
-  border: var(--border-thin) solid var(--border-primary);
+  border: var(--border-thin) solid var(--border-light);
   border-radius: var(--radius-2xl);
   background: var(--bg-elevated);
   padding: var(--space-2xl);
@@ -2818,7 +2877,7 @@ button.ta-watch-result-item {
   transform: translate(-50%, 100%);
   width: min(560px, 100%);
   background: var(--bg-elevated);
-  border: 1px solid var(--border-primary);
+  border: var(--border-thin) solid var(--border-light);
   border-bottom: none;
   border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
   padding: 1.5rem 2rem 2.5rem;
@@ -2867,7 +2926,7 @@ button.ta-watch-result-item {
   align-items: flex-start;
   justify-content: space-between;
   padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border-secondary);
+  border-bottom: var(--border-thin) solid var(--border-light);
 }
 
 .ta-drawer-exchange {
@@ -2887,13 +2946,13 @@ button.ta-watch-result-item {
 .ta-drawer-msg.success {
   background: color-mix(in srgb, var(--accent-secondary) 12%, transparent);
   color: var(--accent-secondary);
-  border: 1px solid color-mix(in srgb, var(--accent-secondary) 30%, transparent);
+  border: var(--border-thin) solid var(--border-light);
 }
 
 .ta-drawer-msg.error {
   background: color-mix(in srgb, var(--danger-primary) 12%, transparent);
   color: var(--danger-primary);
-  border: 1px solid color-mix(in srgb, var(--danger-primary) 30%, transparent);
+  border: var(--border-thin) solid var(--border-light);
 }
 
 /* Clickable table rows that open the drawer */
@@ -2905,4 +2964,3 @@ button.ta-watch-result-item {
 .ta-clickable-row:hover {
   background: color-mix(in srgb, var(--border-light) 40%, transparent);
 }
-

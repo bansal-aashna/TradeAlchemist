@@ -37,6 +37,12 @@ import {
   publishPortfolioSnapshot,
 } from "@/lib/portfolio-store";
 
+type BuyNavigationTarget = {
+  ticker: string;
+  companyName: string;
+  exchange?: string;
+  currentPrice?: number;
+};
 
 function mapHolding(holding: Awaited<ReturnType<typeof getHoldings>>[number]): PortfolioHolding {
   return {
@@ -59,6 +65,7 @@ function mapTransaction(
     dateTime: transaction.dateTime,
     ticker: transaction.ticker,
     company: transaction.company,
+    exchange: transaction.exchange,
     type: transaction.type,
     shares: transaction.shares,
     price: transaction.price,
@@ -147,6 +154,7 @@ export default function DashboardPage() {
   const [priceRefreshVersion, setPriceRefreshVersion] = useState(0);
   const [isAutoTickerEnabled, setIsAutoTickerEnabled] = useState(false);
   const [isTogglingTicker, setIsTogglingTicker] = useState(false);
+  const [buyNavigationStock, setBuyNavigationStock] = useState<BuyNavigationTarget | null>(null);
 
   const handleLogout = useCallback(async () => {
     await signOut(auth);
@@ -159,6 +167,11 @@ export default function DashboardPage() {
 
   const handleTabChange = useCallback((tab: DashboardTab) => {
     setActiveTab(tab);
+  }, []);
+
+  const handleOpenBuyStock = useCallback((stock: BuyNavigationTarget) => {
+    setBuyNavigationStock(stock);
+    setActiveTab("Buy");
   }, []);
 
   const refreshLiveAccountData = useCallback(async () => {
@@ -609,6 +622,8 @@ export default function DashboardPage() {
         onRemoveWatchlist={handleRemoveWatchlist}
         onPreviewNavigate={handleTabChange}
         priceRefreshVersion={priceRefreshVersion}
+        onOpenBuyStock={handleOpenBuyStock}
+        buyNavigationStock={buyNavigationStock}
       />
       {tradeMessage ? <p className="ta-global-message">{tradeMessage}</p> : null}
       {activeTrade ? (

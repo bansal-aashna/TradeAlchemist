@@ -10,6 +10,12 @@ const CHART_HEIGHT = 182;
 
 type ChartsPageProps = {
   priceRefreshVersion?: number;
+  onOpenBuyStock?: (stock: {
+    ticker: string;
+    companyName: string;
+    exchange?: string;
+    currentPrice?: number;
+  }) => void;
 };
 
 function formatCurrency(value: number | undefined, currency: string) {
@@ -105,6 +111,7 @@ function getSeriesByRange(series: ApiOHLCPoint[], range: RangeOption) {
 
 export const ChartsPage = memo(function ChartsPage({
   priceRefreshVersion = 0,
+  onOpenBuyStock,
 }: ChartsPageProps) {
   const [stocks, setStocks] = useState<ApiStock[]>([]);
   const [selectedExchange, setSelectedExchange] = useState<ExchangeId>(
@@ -328,8 +335,12 @@ export const ChartsPage = memo(function ChartsPage({
                 type="button"
                 className="ta-watch-result-item"
                 onClick={() => {
-                  setSelectedSymbol(stock.symbol);
-                  setQuery(stock.symbol);
+                  onOpenBuyStock?.({
+                    ticker: stock.symbol,
+                    companyName: stock.companyName,
+                    exchange: stock.exchange,
+                    currentPrice: stock.currentPrice,
+                  });
                 }}
               >
                 <div>
@@ -354,9 +365,23 @@ export const ChartsPage = memo(function ChartsPage({
               {isLoadingStocks ? "Loading stocks..." : "No stocks returned from backend."}
             </p>
           ) : null}
-          <p className="ta-charts-stock-name">
-            {selected ? `${selected.symbol} - ${selected.companyName}` : "--"}
-          </p>
+          <button
+            type="button"
+            className="ta-stock-link ta-stock-link-heading"
+            onClick={() =>
+              selected &&
+              onOpenBuyStock?.({
+                ticker: selected.symbol,
+                companyName: selected.companyName,
+                exchange: selected.exchange,
+                currentPrice: selected.currentPrice,
+              })
+            }
+          >
+            <p className="ta-charts-stock-name">
+              {selected ? `${selected.symbol} - ${selected.companyName}` : "--"}
+            </p>
+          </button>
           <p className="ta-charts-price">
             {formatCurrency(latest?.close, stockCurrency)}{" "}
             <span>{stockCurrency}</span>

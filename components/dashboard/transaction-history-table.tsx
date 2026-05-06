@@ -8,6 +8,7 @@ export type TransactionRecord = {
   dateTime: string;
   ticker: string;
   company: string;
+  exchange?: string;
   type: TransactionType;
   shares: number;
   price: number;
@@ -17,6 +18,7 @@ export type TransactionRecord = {
 type TransactionHistoryTableProps = {
   transactions: TransactionRecord[];
   onRowClick?: (stock: TradeDrawerStock) => void;
+  onOpenBuyStock?: (stock: TradeDrawerStock) => void;
 };
 
 function formatDateTime(value: string) {
@@ -44,6 +46,7 @@ function formatCurrency(value: number) {
 export const TransactionHistoryTable = memo(function TransactionHistoryTable({
   transactions,
   onRowClick,
+  onOpenBuyStock,
 }: TransactionHistoryTableProps) {
   return (
     <section className="ta-dashboard-content">
@@ -74,8 +77,40 @@ export const TransactionHistoryTable = memo(function TransactionHistoryTable({
                     onClick={() => onRowClick?.({ ticker: transaction.ticker, companyName: transaction.company, exchange: "", currentPrice: transaction.price })}
                   >
                     <td>{formatDateTime(transaction.dateTime)}</td>
-                    <td>{transaction.ticker}</td>
-                    <td>{transaction.company}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="ta-stock-link"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenBuyStock?.({
+                            ticker: transaction.ticker,
+                            companyName: transaction.company,
+                            exchange: transaction.exchange ?? "",
+                            currentPrice: transaction.price,
+                          });
+                        }}
+                      >
+                        <p className="ta-holding-ticker">{transaction.ticker}</p>
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="ta-stock-link ta-stock-link-muted"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenBuyStock?.({
+                            ticker: transaction.ticker,
+                            companyName: transaction.company,
+                            exchange: transaction.exchange ?? "",
+                            currentPrice: transaction.price,
+                          });
+                        }}
+                      >
+                        <p className="ta-stock-company">{transaction.company}</p>
+                      </button>
+                    </td>
                     <td>
                       <span className={`ta-type-pill ${transaction.type}`}>
                         {transaction.type.toUpperCase()}

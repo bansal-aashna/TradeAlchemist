@@ -25,6 +25,7 @@ type DashboardHomeProps = {
   onPreviewNavigate: (tab: DashboardTab) => void;
   onRowClick?: (stock: TradeDrawerStock) => void;
   priceRefreshVersion?: number;
+  onOpenBuyStock?: (stock: TradeDrawerStock) => void;
 };
 
 function formatDateTime(value: string) {
@@ -135,6 +136,7 @@ export const DashboardHome = memo(function DashboardHome({
   onPreviewNavigate,
   onRowClick,
   priceRefreshVersion = 0,
+  onOpenBuyStock,
 }: DashboardHomeProps) {
   const [stocks, setStocks] = useState<ApiStock[]>([]);
   const [selectedExchange, setSelectedExchange] = useState<ExchangeId>(EXCHANGE_OPTIONS[0].id);
@@ -658,8 +660,40 @@ export const DashboardHome = memo(function DashboardHome({
                         className="ta-clickable-row"
                         onClick={() => onRowClick?.({ ticker: stock.ticker, companyName: stock.companyName, exchange: stock.exchange, currentPrice: stock.currentPrice })}
                       >
-                        <td>{stock.ticker}</td>
-                        <td>{stock.companyName}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="ta-stock-link"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onOpenBuyStock?.({
+                                ticker: stock.ticker,
+                                companyName: stock.companyName,
+                                exchange: stock.exchange,
+                                currentPrice: stock.currentPrice,
+                              });
+                            }}
+                          >
+                            <p className="ta-holding-ticker">{stock.ticker}</p>
+                          </button>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="ta-stock-link ta-stock-link-muted"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onOpenBuyStock?.({
+                                ticker: stock.ticker,
+                                companyName: stock.companyName,
+                                exchange: stock.exchange,
+                                currentPrice: stock.currentPrice,
+                              });
+                            }}
+                          >
+                            <p className="ta-stock-company">{stock.companyName}</p>
+                          </button>
+                        </td>
                         <td>{stock.exchange}</td>
                         <td>{formatCurrencyByCode(stock.currentPrice)}</td>
                       </tr>
@@ -710,7 +744,21 @@ export const DashboardHome = memo(function DashboardHome({
                           onClick={() => onRowClick?.({ ticker: holding.ticker, companyName: holding.companyName ?? holding.ticker, exchange: holding.exchange ?? "", currentPrice: holding.currentPrice })}
                         >
                           <td>
-                            <p className="ta-holding-ticker">{holding.ticker}</p>
+                            <button
+                              type="button"
+                              className="ta-stock-link"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onOpenBuyStock?.({
+                                  ticker: holding.ticker,
+                                  companyName: holding.companyName ?? holding.ticker,
+                                  exchange: holding.exchange ?? "",
+                                  currentPrice: holding.currentPrice,
+                                });
+                              }}
+                            >
+                              <p className="ta-holding-ticker">{holding.ticker}</p>
+                            </button>
                             <p className="ta-holding-qty">{holding.quantity ?? "--"} shares</p>
                           </td>
                           <td>{formatCurrency(marketValue)}</td>
@@ -764,7 +812,21 @@ export const DashboardHome = memo(function DashboardHome({
                               {transaction.type.toUpperCase()}
                             </span>
                             <div>
-                              <p className="ta-holding-ticker">{transaction.ticker}</p>
+                              <button
+                                type="button"
+                                className="ta-stock-link"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onOpenBuyStock?.({
+                                    ticker: transaction.ticker,
+                                    companyName: transaction.company,
+                                    exchange: transaction.exchange ?? "",
+                                    currentPrice: transaction.price,
+                                  });
+                                }}
+                              >
+                                <p className="ta-holding-ticker">{transaction.ticker}</p>
+                              </button>
                               <p className="ta-holding-qty">{transaction.shares} shares @ {formatCurrency(transaction.price)}</p>
                             </div>
                           </div>

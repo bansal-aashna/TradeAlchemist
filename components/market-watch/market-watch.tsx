@@ -16,6 +16,7 @@ type MarketWatchProps = {
   onRemoveWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   priceRefreshVersion?: number;
   onRowClick?: (stock: TradeDrawerStock) => void;
+  onOpenBuyStock?: (stock: TradeDrawerStock) => void;
 };
 
 export const MarketWatch = memo(function MarketWatch({
@@ -27,6 +28,7 @@ export const MarketWatch = memo(function MarketWatch({
   onRemoveWatchlist,
   priceRefreshVersion = 0,
   onRowClick,
+  onOpenBuyStock,
 }: MarketWatchProps) {
   const [selectedExchange, setSelectedExchange] = useState<ExchangeId>("NSE");
   const [query, setQuery] = useState("");
@@ -125,10 +127,21 @@ export const MarketWatch = memo(function MarketWatch({
             {filteredStocks.length > 0 ? (
               filteredStocks.map((stock) => (
                 <article key={`${stock.exchange}-${stock.symbol}`} className="ta-watch-result-item">
-                  <div>
+                  <button
+                    type="button"
+                    className="ta-stock-link ta-stock-result-link"
+                    onClick={() =>
+                      onOpenBuyStock?.({
+                        ticker: stock.symbol,
+                        companyName: stock.companyName,
+                        exchange: stock.exchange,
+                        currentPrice: stock.currentPrice,
+                      })
+                    }
+                  >
                     <p className="ta-watch-preview-symbol">{stock.symbol}</p>
                     <p className="ta-watch-preview-name">{stock.companyName}</p>
-                  </div>
+                  </button>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
                     <span className="ta-watch-result-exchange">{stock.exchange}</span>
                     <button
@@ -196,8 +209,40 @@ export const MarketWatch = memo(function MarketWatch({
                       onRowClick?.({ ticker: stock.ticker, companyName: stock.companyName, exchange: stock.exchange, currentPrice: stock.currentPrice });
                     }}
                   >
-                    <td>{stock.ticker}</td>
-                    <td>{stock.companyName}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="ta-stock-link"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenBuyStock?.({
+                            ticker: stock.ticker,
+                            companyName: stock.companyName,
+                            exchange: stock.exchange,
+                            currentPrice: stock.currentPrice,
+                          });
+                        }}
+                      >
+                        <p className="ta-holding-ticker">{stock.ticker}</p>
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="ta-stock-link ta-stock-link-muted"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenBuyStock?.({
+                            ticker: stock.ticker,
+                            companyName: stock.companyName,
+                            exchange: stock.exchange,
+                            currentPrice: stock.currentPrice,
+                          });
+                        }}
+                      >
+                        <p className="ta-stock-company">{stock.companyName}</p>
+                      </button>
+                    </td>
                     <td>{stock.exchange}</td>
 
                     <td>{stock.prevClose?.toFixed(2) ?? "--"}</td>

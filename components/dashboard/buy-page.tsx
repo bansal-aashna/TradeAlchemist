@@ -12,7 +12,19 @@ type BuyPageProps = {
   holdings?: PortfolioHolding[];
   onTradeAction: (trade: TradeDraft) => void;
   priceRefreshVersion?: number;
+  initialStock?: {
+    ticker: string;
+    companyName: string;
+    exchange?: string;
+  } | null;
 };
+
+function toExchangeId(exchange?: string): ExchangeId {
+  return (
+    EXCHANGE_OPTIONS.find((option) => option.id === exchange || option.metadataCode === exchange)?.id ??
+    "NSE"
+  );
+}
 
 function formatCurrency(value: number | undefined, currency = "USD") {
   if (value === undefined) return "--";
@@ -86,6 +98,7 @@ export const BuyPage = memo(function BuyPage({
   holdings,
   onTradeAction,
   priceRefreshVersion = 0,
+  initialStock,
 }: BuyPageProps) {
   const [selectedExchange, setSelectedExchange] = useState<ExchangeId>("NSE");
   const [query, setQuery] = useState("");
@@ -123,8 +136,11 @@ export const BuyPage = memo(function BuyPage({
   }, [selectedExchange, query, priceRefreshVersion]);
 
   useEffect(() => {
-    if (stocks.length === 0 || !query.trim()) {
+    if (!query.trim()) {
       setSelectedSymbol("");
+      return;
+    }
+    if (stocks.length === 0) {
       return;
     }
     const hasCurrentSelection = stocks.some((stock) => stock.symbol === selectedSymbol);
@@ -132,6 +148,17 @@ export const BuyPage = memo(function BuyPage({
       setSelectedSymbol("");
     }
   }, [selectedSymbol, stocks]);
+
+  useEffect(() => {
+    if (!initialStock?.ticker) {
+      return;
+    }
+
+    const nextExchange = toExchangeId(initialStock.exchange);
+    setSelectedExchange(nextExchange);
+    setQuery(initialStock.ticker);
+    setSelectedSymbol(initialStock.ticker);
+  }, [initialStock]);
 
   const selectedStock = useMemo(
     () => stocks.find((stock) => stock.symbol === selectedSymbol),

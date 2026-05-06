@@ -8,6 +8,7 @@ export type TradeDrawerStock = {
   companyName: string;
   exchange: string;
   currentPrice?: number;
+  initialTradeMode?: "buy" | "sell";
 };
 
 type TradeDrawerProps = {
@@ -48,7 +49,7 @@ export const TradeDrawer = memo(function TradeDrawer({
     if (stock) {
       setShares("0");
       setMessage(null);
-      setTradeMode("buy");
+      setTradeMode(stock.initialTradeMode ?? "buy");
       // Small delay so CSS transition fires
       const t = setTimeout(() => setVisible(true), 10);
       return () => clearTimeout(t);

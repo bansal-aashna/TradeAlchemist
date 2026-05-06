@@ -7,6 +7,7 @@ type SellPageProps = {
   holdings?: PortfolioHolding[];
   onTradeAction: (trade: TradeDraft) => void;
   onRowClick?: (stock: TradeDrawerStock) => void;
+  onOpenBuyStock?: (stock: TradeDrawerStock) => void;
 };
 
 function formatCurrency(value: number | undefined) {
@@ -27,7 +28,12 @@ function getValueTone(value: number | undefined) {
   return value > 0 ? "positive" : "negative";
 }
 
-export const SellPage = memo(function SellPage({ holdings, onTradeAction, onRowClick }: SellPageProps) {
+export const SellPage = memo(function SellPage({
+  holdings,
+  onTradeAction,
+  onRowClick,
+  onOpenBuyStock,
+}: SellPageProps) {
   return (
     <section className="ta-dashboard-content ta-sell-page">
       <h2 className="ta-holdings-title">Sell</h2>
@@ -38,10 +44,10 @@ export const SellPage = memo(function SellPage({ holdings, onTradeAction, onRowC
             <tr>
               <th>Stock</th>
               <th>Qty</th>
-              <th>Current Price</th>
-              <th>Hold Price</th>
-              <th>Total P/L</th>
-              <th>Trade</th>
+              <th className="ta-th-light">Current Price</th>
+              <th className="ta-th-light">Hold Price</th>
+              <th className="ta-th-light">Total P/L</th>
+              <th className="ta-th-light">Trade</th>
             </tr>
           </thead>
           <tbody>
@@ -56,11 +62,31 @@ export const SellPage = memo(function SellPage({ holdings, onTradeAction, onRowC
                     className="ta-clickable-row"
                     onClick={(e) => {
                       if ((e.target as HTMLElement).closest('button')) return;
-                      onRowClick?.({ ticker: holding.ticker, companyName: holding.companyName ?? holding.ticker, exchange: holding.exchange ?? "", currentPrice: holding.currentPrice });
+                      onRowClick?.({
+                        ticker: holding.ticker,
+                        companyName: holding.companyName ?? holding.ticker,
+                        exchange: holding.exchange ?? "",
+                        currentPrice: holding.currentPrice,
+                        initialTradeMode: "sell",
+                      });
                     }}
                   >
                     <td>
-                      <p className="ta-holding-ticker">{holding.ticker}</p>
+                      <button
+                        type="button"
+                        className="ta-stock-link"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenBuyStock?.({
+                            ticker: holding.ticker,
+                            companyName: holding.companyName ?? holding.ticker,
+                            exchange: holding.exchange ?? "",
+                            currentPrice: holding.currentPrice,
+                          });
+                        }}
+                      >
+                        <p className="ta-holding-ticker">{holding.ticker}</p>
+                      </button>
                       <p className="ta-holding-qty">Qty: {holding.quantity ?? "--"}</p>
                     </td>
                     <td>{holding.quantity ?? "--"}</td>

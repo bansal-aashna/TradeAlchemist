@@ -26,6 +26,7 @@ type PortfolioOverviewProps = {
   holdings?: PortfolioHolding[];
   onTradeAction: (trade: TradeDraft) => void;
   onRowClick?: (stock: TradeDrawerStock) => void;
+  onOpenBuyStock?: (stock: TradeDrawerStock) => void;
 };
 
 const portfolioFields: Array<{ key: keyof PortfolioMetrics; label: string }> = [
@@ -62,6 +63,7 @@ export const PortfolioOverview = memo(function PortfolioOverview({
   holdings,
   onTradeAction,
   onRowClick,
+  onOpenBuyStock,
 }: PortfolioOverviewProps) {
   return (
     <section className="ta-dashboard-content">
@@ -89,10 +91,10 @@ export const PortfolioOverview = memo(function PortfolioOverview({
             <thead>
               <tr>
                 <th>Stock</th>
-                <th>Current Price</th>
-                <th>Hold Price</th>
-                <th>Total P/L</th>
-                <th>Sell</th>
+                <th className="ta-th-light">Current Price</th>
+                <th className="ta-th-light">Hold Price</th>
+                <th className="ta-th-light">Total P/L</th>
+                <th className="ta-th-light">Sell</th>
               </tr>
             </thead>
             <tbody>
@@ -105,11 +107,31 @@ export const PortfolioOverview = memo(function PortfolioOverview({
                         className="ta-clickable-row"
                         onClick={(e) => {
                           if ((e.target as HTMLElement).closest('button')) return;
-                          onRowClick?.({ ticker: holding.ticker, companyName: holding.companyName ?? holding.ticker, exchange: holding.exchange ?? "", currentPrice: holding.currentPrice });
+                          onRowClick?.({
+                            ticker: holding.ticker,
+                            companyName: holding.companyName ?? holding.ticker,
+                            exchange: holding.exchange ?? "",
+                            currentPrice: holding.currentPrice,
+                            initialTradeMode: "sell",
+                          });
                         }}
                       >
                       <td>
-                        <p className="ta-holding-ticker">{holding.ticker}</p>
+                        <button
+                          type="button"
+                          className="ta-stock-link"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onOpenBuyStock?.({
+                              ticker: holding.ticker,
+                              companyName: holding.companyName ?? holding.ticker,
+                              exchange: holding.exchange ?? "",
+                              currentPrice: holding.currentPrice,
+                            });
+                          }}
+                        >
+                          <p className="ta-holding-ticker">{holding.ticker}</p>
+                        </button>
                         <p className="ta-holding-qty">Qty: {holding.quantity ?? "--"}</p>
                       </td>
                       <td>{holding.currentPrice === undefined ? "--" : formatCurrency(holding.currentPrice)}</td>

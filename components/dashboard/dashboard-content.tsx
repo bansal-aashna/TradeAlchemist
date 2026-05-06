@@ -18,6 +18,13 @@ import type { DashboardTab } from "@/components/dashboard/tabs";
 import type { ApiWatchlistItem } from "@/lib/api";
 import { TradeDrawer, type TradeDrawerStock } from "@/components/dashboard/trade-drawer";
 
+type BuyNavigationTarget = {
+  ticker: string;
+  companyName: string;
+  exchange?: string;
+  currentPrice?: number;
+};
+
 type DashboardContentProps = {
   activeTab: DashboardTab;
   portfolioMetrics?: PortfolioMetrics;
@@ -31,6 +38,8 @@ type DashboardContentProps = {
   onRemoveWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onPreviewNavigate: (tab: DashboardTab) => void;
   priceRefreshVersion: number;
+  onOpenBuyStock: (stock: BuyNavigationTarget) => void;
+  buyNavigationStock?: BuyNavigationTarget | null;
 };
 
 export const DashboardContent = memo(function DashboardContent({
@@ -46,6 +55,8 @@ export const DashboardContent = memo(function DashboardContent({
   onRemoveWatchlist,
   onPreviewNavigate,
   priceRefreshVersion,
+  onOpenBuyStock,
+  buyNavigationStock,
 }: DashboardContentProps) {
   const [drawerStock, setDrawerStock] = useState<TradeDrawerStock | null>(null);
 
@@ -90,6 +101,7 @@ export const DashboardContent = memo(function DashboardContent({
           onRowClick={openDrawer}
           priceRefreshVersion={priceRefreshVersion}
           buyingPower={portfolioMetrics?.buyingPower}
+          onOpenBuyStock={onOpenBuyStock}
         />
       )}
 
@@ -99,6 +111,7 @@ export const DashboardContent = memo(function DashboardContent({
           holdings={holdings}
           onTradeAction={onTradeAction}
           onRowClick={openDrawer}
+          onOpenBuyStock={onOpenBuyStock}
         />
       )}
 
@@ -112,6 +125,7 @@ export const DashboardContent = memo(function DashboardContent({
           onRemoveWatchlist={onRemoveWatchlist}
           priceRefreshVersion={priceRefreshVersion}
           onRowClick={openDrawer}
+          onOpenBuyStock={onOpenBuyStock}
         />
       )}
 
@@ -120,6 +134,7 @@ export const DashboardContent = memo(function DashboardContent({
           holdings={holdings}
           onTradeAction={onTradeAction}
           priceRefreshVersion={priceRefreshVersion}
+          initialStock={buyNavigationStock}
         />
       )}
 
@@ -128,6 +143,7 @@ export const DashboardContent = memo(function DashboardContent({
           holdings={holdings}
           onTradeAction={onTradeAction}
           onRowClick={openDrawer}
+          onOpenBuyStock={onOpenBuyStock}
         />
       )}
 
@@ -135,11 +151,15 @@ export const DashboardContent = memo(function DashboardContent({
         <TransactionHistoryTable
           transactions={transactions}
           onRowClick={openDrawer}
+          onOpenBuyStock={onOpenBuyStock}
         />
       )}
 
       {activeTab === "Analysis" && (
-        <ChartsPage priceRefreshVersion={priceRefreshVersion} />
+        <ChartsPage
+          priceRefreshVersion={priceRefreshVersion}
+          onOpenBuyStock={onOpenBuyStock}
+        />
       )}
     </>
   );
