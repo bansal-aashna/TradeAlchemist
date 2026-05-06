@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 
 type ProfileMenuProps = {
   onLogout: () => Promise<void>;
@@ -13,15 +13,41 @@ export const ProfileMenu = memo(function ProfileMenu({
 }: ProfileMenuProps) {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   const handleLogout = async () => {
     await onLogout();
     setIsMenuOpen(false);
   };
 
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMenuOpen]);
+
   return (
-    <div className="ta-profile-menu">
+    <div className="ta-profile-menu" ref={menuRef}>
      <button
         type="button"
         className="ta-profile-button"
