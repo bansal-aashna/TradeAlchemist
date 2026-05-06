@@ -144,14 +144,14 @@ export const TradeDrawer = memo(function TradeDrawer({
         <div className="ta-trade-seg-wrap" style={{ marginTop: "1.25rem" }}>
           <button
             type="button"
-            className={`ta-trade-seg-btn ${tradeMode === "buy" ? "active" : ""}`}
+            className={`ta-trade-seg-btn buy ${tradeMode === "buy" ? "active" : ""}`}
             onClick={() => { setTradeMode("buy"); setMessage(null); }}
           >
             Buy
           </button>
           <button
             type="button"
-            className={`ta-trade-seg-btn ${tradeMode === "sell" ? "active" : ""}`}
+            className={`ta-trade-seg-btn sell ${tradeMode === "sell" ? "active" : ""}`}
             onClick={() => { setTradeMode("sell"); setMessage(null); }}
           >
             Sell

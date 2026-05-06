@@ -484,14 +484,14 @@ export const BuyPage = memo(function BuyPage({
               <div className="ta-trade-seg-wrap">
                 <button
                   type="button"
-                  className={`ta-trade-seg-btn ${tradeMode === "buy" ? "active" : ""}`}
+                  className={`ta-trade-seg-btn buy ${tradeMode === "buy" ? "active" : ""}`}
                   onClick={() => setTradeMode("buy")}
                 >
                   Buy
                 </button>
                 <button
                   type="button"
-                  className={`ta-trade-seg-btn ${tradeMode === "sell" ? "active" : ""}`}
+                  className={`ta-trade-seg-btn sell ${tradeMode === "sell" ? "active" : ""}`}
                   onClick={() => setTradeMode("sell")}
                 >
                   Sell

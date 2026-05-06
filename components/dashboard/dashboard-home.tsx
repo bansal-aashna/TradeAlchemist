@@ -497,14 +497,14 @@ export const DashboardHome = memo(function DashboardHome({
               <div className="ta-trade-seg-wrap">
                 <button
                   type="button"
-                  className={`ta-trade-seg-btn ${tradeMode === 'buy' ? 'active' : ''}`}
+                  className={`ta-trade-seg-btn buy ${tradeMode === 'buy' ? 'active' : ''}`}
                   onClick={() => setTradeMode('buy')}
                 >
                   Buy
                 </button>
                 <button
                   type="button"
-                  className={`ta-trade-seg-btn ${tradeMode === 'sell' ? 'active' : ''}`}
+                  className={`ta-trade-seg-btn sell ${tradeMode === 'sell' ? 'active' : ''}`}
                   onClick={() => setTradeMode('sell')}
                 >
                   Sell
@@ -610,8 +610,8 @@ export const DashboardHome = memo(function DashboardHome({
               <h3 className="ta-holdings-title">Trade</h3>
               <p className="ta-holdings-subtitle">Select a stock to trade.</p>
               <div className="ta-trade-seg-wrap">
-                <button type="button" className="ta-trade-seg-btn active" disabled>Buy</button>
-                <button type="button" className="ta-trade-seg-btn" disabled>Sell</button>
+                <button type="button" className="ta-trade-seg-btn buy active" disabled>Buy</button>
+                <button type="button" className="ta-trade-seg-btn sell" disabled>Sell</button>
               </div>
               <div className="ta-trade-field">
                 <label className="ta-trade-field-label">Shares</label>
