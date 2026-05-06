@@ -384,7 +384,7 @@ export const DashboardHome = memo(function DashboardHome({
           <div className="ta-dh-selected-grid">
             {/* Chart Column */}
             <article className="ta-dashboard-section-card" style={{ padding: '1.25rem' }}>
-              <div className="ta-buy-selected-card ta-dashboard-selected-row" style={{ marginTop: 0, paddingBottom: '1rem', borderBottom: '1px solid var(--border-secondary)' }}>
+              <div className="ta-buy-selected-card ta-dashboard-selected-row" style={{ marginTop: 0, paddingBottom: '1rem', borderBottom: '1px solid var(--border-light)' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <p className="ta-buy-selected-symbol">{selectedStock.symbol}</p>
@@ -593,7 +593,7 @@ export const DashboardHome = memo(function DashboardHome({
         ) : (
           <div className="ta-dh-selected-grid">
             <article className="ta-dashboard-section-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
-              <div className="ta-buy-selected-card ta-dashboard-selected-row" style={{ marginTop: 0, paddingBottom: '1rem', borderBottom: '1px solid var(--border-secondary)', opacity: 0.4 }}>
+              <div className="ta-buy-selected-card ta-dashboard-selected-row" style={{ marginTop: 0, paddingBottom: '1rem', borderBottom: '1px solid var(--border-light)', opacity: 0.4 }}>
                 <div>
                   <p className="ta-buy-selected-symbol">--</p>
                   <p className="ta-buy-selected-company">--</p>

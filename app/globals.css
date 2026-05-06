@@ -969,7 +969,7 @@ select:focus-visible {
 
 .ta-preview-link:hover .ta-holdings-title,
 .ta-preview-link:focus-visible .ta-holdings-title {
-  color: var(--accent-primary);
+  color: var(--text-primary);
 }
 
 .ta-preview-link:focus-visible {
@@ -999,14 +999,12 @@ select:focus-visible {
 
 .ta-stock-link:hover,
 .ta-stock-link:focus-visible {
-  background: color-mix(in srgb, var(--border-secondary) 28%, var(--bg-tertiary) 72%);
   color: var(--text-primary);
   font-weight: 700;
   outline: none;
 }
 
 .ta-stock-link:active {
-  background: color-mix(in srgb, var(--border-secondary) 38%, var(--bg-tertiary) 62%);
   color: var(--text-primary);
   font-weight: 700;
   transform: translateY(1px);
@@ -2182,7 +2180,7 @@ button.ta-watch-result-item {
 }
 
 .ta-watch-result-item:hover {
-  background: var(--border-light);
+  /* Removed highlight box */
 }
 
 /* Exchange badge shown on the right of each result row */
@@ -2212,8 +2210,15 @@ button.ta-watch-result-item {
 
 .ta-watch-preview-symbol {
   font-size: var(--text-xl);
-  font-weight: 700;
+  font-weight: 500;
   color: var(--text-primary);
+  transition: font-weight 150ms ease;
+}
+
+.ta-watch-result-item:hover .ta-watch-preview-symbol,
+.ta-watch-result-item:focus-visible .ta-watch-preview-symbol,
+.ta-watch-result-item:active .ta-watch-preview-symbol {
+  font-weight: 700;
 }
 
 .ta-watch-preview-name {
@@ -2428,8 +2433,14 @@ button.ta-watch-result-item {
 }
 
 .ta-holding-ticker {
-  font-weight: 700;
+  font-weight: 500;
   font-size: var(--text-xl);
+  transition: font-weight 150ms ease;
+}
+
+.ta-clickable-row:hover .ta-holding-ticker,
+.ta-clickable-row:active .ta-holding-ticker {
+  font-weight: 700;
 }
 
 .ta-holding-qty {
@@ -2588,8 +2599,7 @@ button.ta-watch-result-item {
     font-size: var(--text-7xl);
   }
 
-  .ta-watch-card-subtitle,
-  .ta-watch-preview-name {
+  .ta-watch-card-subtitle {
     font-size: var(--text-2xl);
   }
 }
@@ -2639,7 +2649,7 @@ button.ta-watch-result-item {
 
   .ta-buy-select-wrap,
   .ta-buy-select {
-    width: 300px;
+    width: 100%;
   }
 
   .ta-buy-layout-grid {
@@ -2962,5 +2972,5 @@ button.ta-watch-result-item {
 }
 
 .ta-clickable-row:hover {
-  background: color-mix(in srgb, var(--border-light) 40%, transparent);
+  /* Removed highlight box */
 }
