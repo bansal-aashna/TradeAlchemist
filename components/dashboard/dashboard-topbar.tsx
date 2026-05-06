@@ -7,18 +7,32 @@ type DashboardTopbarProps = {
   activeTab: DashboardTab;
   isDarkMode: boolean;
   userName?: string | null;
+  backendStatus: "connected" | "disconnected";
+  backendMessage: string;
+  isAutoTickerEnabled: boolean;
+  isTogglingTicker: boolean;
+  isRefreshingPrices: boolean;
   onTabChange: (tab: DashboardTab) => void;
   onThemeToggle: () => void;
   onLogout: () => Promise<void>;
+  onAutoTickerToggle: () => Promise<void>;
+  onRefreshPrices: () => Promise<void>;
 };
 
 export const DashboardTopbar = memo(function DashboardTopbar({
   activeTab,
   isDarkMode,
   userName,
+  backendStatus,
+  backendMessage,
+  isAutoTickerEnabled,
+  isTogglingTicker,
+  isRefreshingPrices,
   onTabChange,
   onThemeToggle,
   onLogout,
+  onAutoTickerToggle,
+  onRefreshPrices,
 }: DashboardTopbarProps) {
   return (
     <header className="ta-topbar">
@@ -57,6 +71,13 @@ export const DashboardTopbar = memo(function DashboardTopbar({
         <ProfileMenu
           onLogout={onLogout}
           isDarkMode={isDarkMode}
+          backendStatus={backendStatus}
+          backendMessage={backendMessage}
+          isAutoTickerEnabled={isAutoTickerEnabled}
+          isTogglingTicker={isTogglingTicker}
+          isRefreshingPrices={isRefreshingPrices}
+          onAutoTickerToggle={onAutoTickerToggle}
+          onRefreshPrices={onRefreshPrices}
         />
       </div>
     </header>

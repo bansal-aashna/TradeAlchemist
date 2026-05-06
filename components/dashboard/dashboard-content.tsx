@@ -133,6 +133,8 @@ export const DashboardContent = memo(function DashboardContent({
         <BuyPage
           holdings={holdings}
           onTradeAction={onTradeAction}
+          onExecuteTrade={onExecuteTrade}
+          buyingPower={portfolioMetrics?.buyingPower}
           priceRefreshVersion={priceRefreshVersion}
           initialStock={buyNavigationStock}
         />

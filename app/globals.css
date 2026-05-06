@@ -412,20 +412,20 @@ select:focus-visible {
 
 .ta-auth-page {
   min-height: 100vh;
-  padding: 2rem 1.25rem;
-  background: #0a0a0a;
+  padding: var(--space-2xl) var(--space-lg);
+  background: var(--bg-primary);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.15rem;
+  gap: var(--space-xl);
 }
 
 .ta-auth-brand {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: var(--space-md);
 }
 
 .ta-auth-logo {
@@ -444,9 +444,9 @@ select:focus-visible {
   width: min(100%, 500px);
   min-height: auto; /* Removed 550px fixed height for better balance */
   border: var(--border-thin) solid var(--border-light);
-  background: #111111;
-  border-radius: 14px;
-  padding: 1.75rem 2.5rem 1.6rem;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl) var(--space-xl) var(--space-xl);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
   display: flex;
   flex-direction: column;
@@ -454,47 +454,47 @@ select:focus-visible {
 
 @media (max-width: 480px) {
   .ta-auth-card {
-    padding: 1.5rem 1.25rem; /* Reduced padding for mobile */
+    padding: var(--space-xl) var(--space-lg); /* Reduced padding for mobile */
   }
 }
 
 .ta-auth-header {
   text-align: center;
-  margin-bottom: 1.2rem;
+  margin-bottom: var(--space-xl);
 }
 
 .ta-auth-heading {
   font-size: clamp(1.5rem, 1.8vw, 1.9rem);
   line-height: 1.1;
   font-weight: 500;
-  color: #f5f7fb;
+  color: var(--text-primary);
 }
 
 .ta-auth-copy {
-  margin: 0.55rem auto 0;
+  margin: var(--space-sm) auto 0;
   max-width: 480px;
-  color: #a5a9b3;
-  font-size: 1.2rem;
+  color: var(--text-secondary);
+  font-size: var(--text-xl);
   line-height: 1.4;
 }
 
 .ta-auth-page .ta-form {
   margin-top: 0;
-  gap: 1.45rem;
+  gap: var(--space-xl);
   flex: 1;
 }
 
 .ta-auth-field {
   display: grid;
-  gap: 0.2rem;
+  gap: var(--space-xs);
 }
 
 .ta-auth-page .ta-label {
   margin-top: 0;
   margin-bottom: 0;
-  font-size: 1.3rem;
+  font-size: var(--text-lg);
   font-weight: 500;
-  color: #f1f4fa;
+  color: var(--text-primary);
   line-height: 1.1;
 }
 
@@ -502,37 +502,37 @@ select:focus-visible {
   margin-top: 0;
   min-height: 42px;
   border: var(--border-thin) solid var(--border-light);
-  background: #0c0c0c;
-  border-radius: 10px;
-  padding: 0 0.9rem;
-  font-size: 1.1rem;
-  color: #f5f7fb;
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-md);
+  font-size: var(--text-base);
+  color: var(--text-primary);
 }
 
 .ta-auth-page .ta-input::placeholder {
-  color: #8f95a2;
+  color: var(--text-disabled);
 }
 
 .ta-auth-page .ta-input:focus {
   border-color: var(--border-light);
-  box-shadow: 0 0 0 1px rgba(33, 185, 84, 0.22);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-primary) 22%, transparent);
 }
 
 .ta-auth-row {
-  margin-top: 0.9rem;
+  margin-top: var(--space-md);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--space-md);
   flex-wrap: wrap;
 }
 
 .ta-auth-check {
   display: inline-flex;
   align-items: center;
-  gap: 0.7rem;
-  color: #eceff5;
-  font-size: 0.95rem;
+  gap: var(--space-sm);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
@@ -546,7 +546,7 @@ select:focus-visible {
   width: 22px;
   height: 22px;
   border: var(--border-thin) solid var(--border-light);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -575,21 +575,21 @@ select:focus-visible {
 
 .ta-auth-inline-link {
   color: var(--accent-primary);
-  font-size: 0.95rem;
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 
 .ta-auth-page .ta-button {
   width: 100%;
   min-height: 52px;
-  margin-top: 0.45rem;
-  background: #28cf58;
-  color: #ffffff;
+  margin-top: var(--space-sm);
+  background: var(--accent-secondary);
+  color: var(--bg-primary);
   border: none;
-  border-radius: 12px;
-  font-size: 1.1rem;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-lg);
   font-weight: 600;
-  padding: 0 1.5rem;
+  padding: 0 var(--space-xl);
   transition: all 0.2s ease;
   cursor: pointer;
   display: flex;
@@ -599,9 +599,9 @@ select:focus-visible {
 
 
 .ta-auth-page .ta-button:hover {
-  background: #20b84d;
+  background: color-mix(in srgb, var(--accent-secondary) 80%, #fff 20%);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(40, 207, 88, 0.3);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-secondary) 30%, transparent);
 }
 
 .ta-auth-page .ta-button:active {
@@ -609,15 +609,15 @@ select:focus-visible {
 }
 
 .ta-auth-page .ta-error {
-  margin-top: 0.35rem;
-  font-size: 0.88rem;
+  margin-top: var(--space-xs);
+  font-size: var(--text-sm);
 }
 
 .ta-auth-link-row {
   margin-top: auto;
-  padding-top: 1.05rem;
-  color: #a5a9b3;
-  font-size: 1.2rem;
+  padding-top: var(--space-lg);
+  color: var(--text-secondary);
+  font-size: var(--text-xl);
   font-weight: 400;
 }
 
@@ -806,12 +806,14 @@ select:focus-visible {
   position: absolute;
   right: 0;
   top: calc(100% + var(--space-sm));
-  min-width: 144px;
-  border-radius: var(--radius-md);
-  padding: var(--space-xs);
+  width: 300px;
+  max-width: min(300px, calc(100vw - 2rem));
+  border-radius: var(--radius-lg);
+  padding: 0.5rem;
   border: var(--border-thin) solid var(--border-light);
   background: var(--bg-primary);
   z-index: 3;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
 }
 
 .ta-profile-dropdown button {
@@ -821,12 +823,93 @@ select:focus-visible {
   color: var(--text-primary);
   text-align: left;
   border-radius: var(--radius-sm);
-  padding: var(--space-sm) var(--space-sm);
+  padding: 0.7rem 0.8rem;
   cursor: pointer;
+  font-size: var(--text-sm);
 }
 
 .ta-profile-dropdown button:hover {
   background: var(--border-light);
+}
+
+.ta-profile-backend-tools {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.25rem 0.25rem 0.7rem;
+  margin-bottom: 0.4rem;
+  border-bottom: var(--border-thin) solid var(--border-light);
+}
+
+.ta-profile-backend-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
+.ta-profile-backend-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.ta-profile-backend-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.ta-profile-backend-actions .ta-auto-ticker-pill {
+  margin-left: 0;
+}
+
+.ta-profile-backend-actions .ta-profile-action-btn {
+  width: auto;
+  min-width: 104px;
+}
+
+.ta-profile-backend-actions .ta-profile-refresh-btn {
+  flex: 0 0 auto;
+}
+
+.ta-backend-status-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ta-profile-dropdown {
+  width: 332px;
+  max-width: min(332px, calc(100vw - 2rem));
+}
+
+.ta-profile-backend-tools {
+  gap: 0.5rem;
+}
+
+.ta-profile-action-btn {
+  justify-content: center;
+  min-height: 40px;
+  min-width: 104px;
+  border: var(--border-thin) solid var(--border-light) !important;
+  background: var(--bg-elevated) !important;
+  text-align: center !important;
+  font-weight: 600;
+}
+
+.ta-profile-refresh-btn {
+  width: 42px !important;
+  min-width: 42px;
+  padding: 0.35rem;
+}
+
+.ta-profile-menu-actions {
+  display: grid;
+  gap: 0.3rem;
 }
 
 /* ===== DASHBOARD CONTENT ===== */
@@ -844,15 +927,6 @@ select:focus-visible {
   background: rgba(200, 35, 51, 0.12);
   color: var(--text-primary);
   font-size: var(--text-sm);
-}
-
-.ta-backend-status-wrap {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: 0.45rem 1rem;
-  border-bottom: var(--border-thin) solid var(--border-light);
-  background: var(--bg-secondary);
 }
 
 .ta-backend-status-pill {
@@ -1246,34 +1320,47 @@ select:focus-visible {
   overflow: hidden;
 }
 
-.ta-charts-page .ta-charts-stock-name {
-  font-size: clamp(1.05rem, 1.57vw, 1.45rem);
+.ta-charts-page .ta-charts-stock-name,
+.ta-buy-chart-panel .ta-charts-stock-name {
+  font-size: clamp(1.18rem, 1.45vw, 1.55rem);
   line-height: 1.2;
   font-weight: 700;
-  margin-bottom: 0.15rem;
+  color: var(--text-primary);
+  margin-bottom: 0.18rem;
 }
 
-.ta-charts-page .ta-charts-price {
-  font-size: clamp(1.3rem, 2.25vw, 2rem);
+.ta-charts-page .ta-charts-price,
+.ta-buy-chart-panel .ta-charts-price {
+  font-size: clamp(1.55rem, 2.2vw, 2.15rem);
+  line-height: 1;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
-.ta-charts-page .ta-charts-price span {
-  font-size: clamp(0.78rem, 0.86vw, 1rem);
+.ta-charts-page .ta-charts-price span,
+.ta-buy-chart-panel .ta-charts-price span {
+  font-size: clamp(0.88rem, 1vw, 1.02rem);
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
-.ta-charts-page .ta-charts-change {
-  margin-top: 0.35rem;
-  font-size: clamp(0.8rem, 1.01vw, 1.05rem);
+.ta-charts-page .ta-charts-change,
+.ta-buy-chart-panel .ta-charts-change {
+  margin-top: 0.3rem;
+  font-size: clamp(0.92rem, 1.02vw, 1.08rem);
+  font-weight: 700;
 }
 
-.ta-charts-page .ta-charts-ranges {
-  margin-top: 0.5rem;
+.ta-charts-page .ta-charts-ranges,
+.ta-buy-chart-panel .ta-charts-ranges {
+  margin-top: 0.55rem;
   gap: 0.45rem;
 }
 
-.ta-charts-page .ta-charts-range-btn {
-  font-size: 0.75rem;
-  padding: 0.25rem 0.625rem;
+.ta-charts-page .ta-charts-range-btn,
+.ta-buy-chart-panel .ta-charts-range-btn {
+  font-size: 0.76rem;
+  padding: 0.26rem 0.7rem;
   border-radius: 20px;
 }
 
@@ -1604,29 +1691,30 @@ select:focus-visible {
 /* Outer container card (wraps the row of select + input) */
 .ta-buy-search-card,
 .ta-watch-search-card {
-  border: 1px solid var(--search-border);
-  border-radius: var(--radius-xl);
-  background: var(--bg-tertiary);
-  padding: 0.45rem;
+  border: var(--border-thin) solid var(--border-light);
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  padding: 1.35rem 1.5rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
 /* Row layout: exchange select | search input */
 .ta-buy-search-row {
   display: grid;
   gap: 0.5rem;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: 320px 1fr;
   width: 100%;
 }
 
 /* Exchange dropdown wrapper — same width as the select itself */
 .ta-buy-select-wrap {
   position: relative;
-  width: 220px;
+  width: 320px;
 }
 
 /* Exchange dropdown */
 .ta-buy-select {
-  width: 220px;
+  width: 320px;
   height: 44px;
   border-radius: var(--radius-xl);
   border: 1px solid var(--search-border);
@@ -1792,7 +1880,7 @@ select:focus-visible {
   display: grid;
   margin-top: 1rem;
   gap: 0.8rem;
-  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 2.2fr) minmax(300px, 0.82fr);
   min-height: 0;
   align-items: stretch;
 }
@@ -1807,6 +1895,9 @@ select:focus-visible {
   display: grid;
   gap: 0.8rem;
   grid-template-rows: auto 1fr;
+  width: 100%;
+  max-width: 360px;
+  justify-self: end;
 }
 
 .ta-buy-panel {
@@ -1863,22 +1954,6 @@ select:focus-visible {
   min-width: 0;
   display: flex;
   flex-direction: column;
-}
-
-.ta-buy-chart-panel .ta-charts-stock-name {
-  font-size: clamp(1.3rem, 1.2vw, 1.5rem);
-  color: var(--text-secondary);
-  margin-bottom: 0.3rem;
-}
-
-.ta-buy-chart-panel .ta-charts-price {
-  font-size: clamp(1rem, 0.9vw, 1.15rem);
-  font-weight: 600;
-}
-
-.ta-buy-chart-panel .ta-charts-change {
-  font-size: 0.95rem;
-  margin-top: 0.2rem;
 }
 
 .ta-buy-chart-panel .ta-charts-line {
@@ -2864,10 +2939,6 @@ button.ta-watch-result-item {
 }
 
 /* .ta-trade-submit-btn / .ta-sell-pill-btn — all handled by unified pill system above */
-
-.ta-auth-page {
-  background: #000000 !important;
-}
 
 /* ===== TRADE DRAWER ===== */
 .ta-drawer-backdrop {

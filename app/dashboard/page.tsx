@@ -570,45 +570,17 @@ export default function DashboardPage() {
         activeTab={activeTab}
         isDarkMode={isDarkMode}
         userName={userName}
+        backendStatus={backendStatus}
+        backendMessage={backendMessage}
+        isAutoTickerEnabled={isAutoTickerEnabled}
+        isTogglingTicker={isTogglingTicker}
+        isRefreshingPrices={isRefreshingPrices}
         onTabChange={handleTabChange}
         onThemeToggle={handleThemeToggle}
         onLogout={handleLogout}
+        onAutoTickerToggle={handleAutoTickerToggle}
+        onRefreshPrices={handleRefreshPrices}
       />
-      <div className="ta-backend-status-wrap">
-        <span className={`ta-backend-status-pill ${backendStatus}`}>
-          Backend: {backendStatus === "connected" ? "Connected" : "Disconnected"}
-        </span>
-        <span className="ta-backend-status-text">{backendMessage}</span>
-        <span className={`ta-auto-ticker-pill ${isAutoTickerEnabled ? "on" : "off"}`}>
-          Auto: {isAutoTickerEnabled ? "On" : "Off"}
-        </span>
-        <button
-          type="button"
-          className="ta-price-refresh-btn ta-auto-ticker-btn"
-          onClick={handleAutoTickerToggle}
-          disabled={isTogglingTicker}
-        >
-          {isTogglingTicker
-            ? "Updating..."
-            : isAutoTickerEnabled
-              ? "Stop Auto"
-              : "Start Auto"}
-        </button>
-        <button
-          type="button"
-          className="ta-price-refresh-btn"
-          onClick={handleRefreshPrices}
-          disabled={isRefreshingPrices}
-          aria-label={isRefreshingPrices ? "Refreshing prices" : "Refresh prices"}
-          title={isRefreshingPrices ? "Refreshing prices" : "Refresh prices"}
-        >
-          <img
-            src="/refresh.png"
-            alt=""
-            className={`ta-price-refresh-icon ${isRefreshingPrices ? "spinning" : ""}`}
-          />
-        </button>
-      </div>
       <DashboardContent
         activeTab={activeTab}
         portfolioMetrics={portfolioMetrics}

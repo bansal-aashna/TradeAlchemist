@@ -11,6 +11,8 @@ type RangeOption = (typeof rangeOptions)[number];
 type BuyPageProps = {
   holdings?: PortfolioHolding[];
   onTradeAction: (trade: TradeDraft) => void;
+  onExecuteTrade?: (trade: TradeDraft, shares: number) => Promise<void>;
+  buyingPower?: number;
   priceRefreshVersion?: number;
   initialStock?: {
     ticker: string;
@@ -97,6 +99,8 @@ function toChartPath(values: number[], width: number, height: number) {
 export const BuyPage = memo(function BuyPage({
   holdings,
   onTradeAction,
+  onExecuteTrade,
+  buyingPower,
   priceRefreshVersion = 0,
   initialStock,
 }: BuyPageProps) {
@@ -105,6 +109,9 @@ export const BuyPage = memo(function BuyPage({
   const [selectedSymbol, setSelectedSymbol] = useState("");
   const [activeRange, setActiveRange] = useState<RangeOption>("1Y");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [tradeMode, setTradeMode] = useState<"buy" | "sell">("buy");
+  const [shares, setShares] = useState("0");
+  const [isTrading, setIsTrading] = useState(false);
   const [stocks, setStocks] = useState<ApiStock[]>([]);
   const [historySeries, setHistorySeries] = useState<ApiOHLCPoint[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -374,7 +381,6 @@ export const BuyPage = memo(function BuyPage({
       {selectedStock ? (
         <div className="ta-buy-layout-grid">
           <article className="ta-buy-panel ta-buy-chart-panel">
-            <h3 className="ta-buy-panel-title">Historical Performance</h3>
             <p className="ta-charts-stock-name" style={{ marginTop: '0.75rem' }}>
               {selectedStock.symbol} - {selectedStock.companyName}
             </p>
@@ -472,44 +478,130 @@ export const BuyPage = memo(function BuyPage({
           </article>
 
           <div className="ta-buy-side-column">
-            <article className="ta-buy-panel ta-buy-actions-panel">
-              <div className="ta-buy-actions-row">
+            <article className="ta-buy-panel ta-trade-card">
+              <h3 className="ta-holdings-title">Trade {selectedStock.symbol}</h3>
+
+              <div className="ta-trade-seg-wrap">
                 <button
                   type="button"
-                  className="ta-buy-action-btn ta-trade-pill buy"
-                  disabled={!selectedStock}
-                  onClick={() => {
-                    if (!selectedStock?.currentPrice) return;
-                    onTradeAction({
-                      ticker: selectedStock.symbol,
-                      company: selectedStock.companyName,
-                      exchange: selectedStock.exchange,
-                      price: selectedStock.currentPrice,
-                      type: "buy",
-                    });
-                  }}
+                  className={`ta-trade-seg-btn ${tradeMode === "buy" ? "active" : ""}`}
+                  onClick={() => setTradeMode("buy")}
                 >
                   Buy
                 </button>
                 <button
                   type="button"
-                  className="ta-buy-action-btn ta-trade-pill sell"
-                  disabled={!canSell}
-                  onClick={() => {
-                    if (!selectedStock?.currentPrice) return;
-                    onTradeAction({
-                      ticker: selectedStock.symbol,
-                      company: selectedStock.companyName,
-                      exchange: selectedStock.exchange,
-                      price: selectedStock.currentPrice,
-                      type: "sell",
-                      maxShares: availableSellShares,
-                    });
-                  }}
+                  className={`ta-trade-seg-btn ${tradeMode === "sell" ? "active" : ""}`}
+                  onClick={() => setTradeMode("sell")}
                 >
                   Sell
                 </button>
               </div>
+
+              <div className="ta-trade-field">
+                <label className="ta-trade-field-label">Shares</label>
+                <div className="ta-trade-shares-row">
+                  <input
+                    type="number"
+                    min="0"
+                    className="ta-trade-shares-input"
+                    value={shares}
+                    onChange={(event) => setShares(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="ta-trade-max-btn"
+                    onClick={() => {
+                      if (tradeMode === "sell") {
+                        setShares(String(availableSellShares));
+                      } else if (selectedStock.currentPrice && selectedStock.currentPrice > 0) {
+                        setShares(String(Math.floor((buyingPower ?? 0) / selectedStock.currentPrice)));
+                      }
+                    }}
+                  >
+                    Max
+                  </button>
+                </div>
+              </div>
+
+              <div className="ta-trade-info">
+                <div className="ta-trade-info-row">
+                  <span>Estimated Cost:</span>
+                  <span>
+                    {formatCurrency(
+                      (Number(shares) || 0) * (selectedStock.currentPrice ?? 0),
+                      stockCurrency,
+                    )}
+                  </span>
+                </div>
+                <div className="ta-trade-info-row">
+                  <span>Buying Power:</span>
+                  <span>{formatCurrency(buyingPower ?? 0)}</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className={`ta-trade-cta-btn ${tradeMode}`}
+                disabled={
+                  isTrading ||
+                  !selectedStock.currentPrice ||
+                  Number(shares) <= 0 ||
+                  (tradeMode === "sell" && Number(shares) > availableSellShares)
+                }
+                onClick={async () => {
+                  if (isTrading || !selectedStock.currentPrice) return;
+
+                  const qty = Number(shares);
+                  if (Number.isNaN(qty) || qty <= 0) return;
+
+                  if (onExecuteTrade) {
+                    setIsTrading(true);
+                    try {
+                      if (tradeMode === "sell") {
+                        if (availableSellShares <= 0 || qty > availableSellShares) return;
+                        await onExecuteTrade(
+                          {
+                            ticker: selectedStock.symbol,
+                            company: selectedStock.companyName,
+                            exchange: selectedStock.exchange,
+                            price: selectedStock.currentPrice,
+                            type: "sell",
+                            maxShares: availableSellShares,
+                          },
+                          qty,
+                        );
+                      } else {
+                        await onExecuteTrade(
+                          {
+                            ticker: selectedStock.symbol,
+                            company: selectedStock.companyName,
+                            exchange: selectedStock.exchange,
+                            price: selectedStock.currentPrice,
+                            type: "buy",
+                          },
+                          qty,
+                        );
+                      }
+                      setShares("0");
+                    } finally {
+                      setIsTrading(false);
+                    }
+                    return;
+                  }
+
+                  onTradeAction({
+                    ticker: selectedStock.symbol,
+                    company: selectedStock.companyName,
+                    exchange: selectedStock.exchange,
+                    price: selectedStock.currentPrice,
+                    type: tradeMode,
+                    maxShares: tradeMode === "sell" ? availableSellShares : undefined,
+                  });
+                }}
+              >
+                {isTrading ? "Processing..." : tradeMode === "buy" ? "Place Buy Order" : "Place Sell Order"}
+              </button>
             </article>
 
             <article className="ta-buy-panel ta-buy-stats-panel">

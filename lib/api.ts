@@ -497,8 +497,9 @@ export async function getBackendHealth(): Promise<BackendHealth> {
 export async function searchStocks(params: { exchange?: string; q?: string } = {}) {
   const path = process.env.NEXT_PUBLIC_API_STOCK_SEARCH_PATH ?? "/stocks/search";
   const query = new URLSearchParams();
-  if (params.exchange) {
-    query.set("exchange", getExchangeCode(params.exchange));
+  const exchangeCode = params.exchange ? getExchangeCode(params.exchange) : "";
+  if (exchangeCode) {
+    query.set("exchange", exchangeCode);
   }
   if (params.q) {
     query.set("q", params.q);

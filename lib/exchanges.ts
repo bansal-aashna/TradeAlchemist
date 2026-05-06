@@ -1,5 +1,10 @@
 export const EXCHANGE_OPTIONS = [
   {
+    id: "ALL",
+    label: "All Exchanges",
+    metadataCode: "",
+  },
+  {
     id: "NSE",
     label: "National Stock Exchange of India (NSE)",
     metadataCode: "NSI",
@@ -16,7 +21,7 @@ export const EXCHANGE_OPTIONS = [
   },
   {
     id: "NASDAQ",
-    label: "NASDAQ (NASDAQ)",
+    label: "NASDAQ",
     metadataCode: "NMS",
   },
   {
@@ -63,5 +68,8 @@ const METADATA_CODE_BY_ID: Record<ExchangeId, string> = EXCHANGE_OPTIONS.reduce(
 );
 
 export function getExchangeCode(exchange: string) {
+  if (exchange === "ALL") {
+    return "";
+  }
   return (METADATA_CODE_BY_ID as Record<string, string>)[exchange] ?? exchange;
 }
