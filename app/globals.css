@@ -247,6 +247,21 @@
   border: 1px solid var(--border-secondary);
   background: var(--surface-secondary);
   color: var(--text-primary);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease,
+    border-color 120ms ease, background-color 120ms ease,
+    opacity 120ms ease;
+}
+
+.ta-analysis-search-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--border-primary);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.25);
+}
+
+.ta-analysis-search-btn:active:not(:disabled) {
+  transform: translateY(0px) scale(0.98);
+  box-shadow: none;
 }
 
 .ta-analysis-search-btn:disabled {
