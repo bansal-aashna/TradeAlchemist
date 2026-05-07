@@ -2,7 +2,9 @@
 
 import { memo, useEffect, useMemo, useState } from "react";
 import { getStockHistory, searchStocks, type ApiOHLCPoint, type ApiStock } from "@/lib/api";
-import { EXCHANGE_OPTIONS, type ExchangeId } from "@/lib/exchanges";
+import { EXCHANGE_OPTIONS } from "@/lib/exchanges";
+import type { PortfolioHolding } from "@/components/dashboard/portfolio-overview";
+import type { ApiWatchlistItem } from "@/lib/api";
 const rangeOptions = ["1D", "5D", "1M", "6M", "YTD", "1Y"] as const;
 type RangeOption = (typeof rangeOptions)[number];
 const CHART_WIDTH = 980;
@@ -16,6 +18,8 @@ type ChartsPageProps = {
     exchange?: string;
     currentPrice?: number;
   }) => void;
+  holdings?: PortfolioHolding[];
+  watchlist?: ApiWatchlistItem[];
 };
 
 function formatCurrency(value: number | undefined, currency: string) {
@@ -109,22 +113,112 @@ function getSeriesByRange(series: ApiOHLCPoint[], range: RangeOption) {
   return series.filter((point) => new Date(point.date) >= from);
 }
 
+function extractTickerFromQuery(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const match = trimmed.match(/\(([^()]+)\)\s*$/);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  return trimmed;
+}
+
 export const ChartsPage = memo(function ChartsPage({
   priceRefreshVersion = 0,
   onOpenBuyStock,
+  holdings,
+  watchlist,
 }: ChartsPageProps) {
   const [stocks, setStocks] = useState<ApiStock[]>([]);
-  const [selectedExchange, setSelectedExchange] = useState<ExchangeId>(
-    EXCHANGE_OPTIONS[0].id,
-  );
   const [query, setQuery] = useState("");
+  const [pendingSymbol, setPendingSymbol] = useState<string>("");
   const [selectedSymbol, setSelectedSymbol] = useState("");
+  const [isStockView, setIsStockView] = useState(false);
   const [activeRange, setActiveRange] = useState<RangeOption>("1Y");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [historySeries, setHistorySeries] = useState<ApiOHLCPoint[]>([]);
   const [isLoadingStocks, setIsLoadingStocks] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+
+  const effectiveSearchTerm = useMemo(() => extractTickerFromQuery(query), [query]);
+
+  const recommendationChips = useMemo(() => {
+    const max = 10;
+    const picked = new Set<string>();
+    const chips: Array<{ ticker: string; companyName?: string; exchangeCode?: string }> = [];
+
+    const pushChip = (tickerRaw: string | undefined, companyName?: string, exchangeCode?: string) => {
+      const ticker = (tickerRaw ?? "").trim().toUpperCase();
+      if (!ticker || picked.has(ticker)) return;
+      picked.add(ticker);
+      chips.push({ ticker, companyName, exchangeCode });
+    };
+
+    for (const holding of holdings ?? []) {
+      if (chips.length >= max) break;
+      pushChip(holding.ticker, holding.companyName, holding.exchange);
+    }
+
+    for (const item of watchlist ?? []) {
+      if (chips.length >= max) break;
+      pushChip(item.ticker, item.companyName, item.exchange);
+    }
+
+    if (chips.length < max && !query.trim()) {
+      const candidates = (stocks ?? []).filter((stock) => stock.symbol);
+      const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+      for (const stock of shuffled) {
+        if (chips.length >= max) break;
+        pushChip(stock.symbol, stock.companyName, stock.exchange);
+      }
+    }
+
+    return chips;
+  }, [holdings, watchlist, stocks, query]);
+
+  const formatChipLabel = (chip: { ticker: string; companyName?: string }) => {
+    const name = (chip.companyName ?? "").trim();
+    if (name) {
+      return name;
+    }
+    return chip.ticker;
+  };
+
+  const handleSelectCandidate = (ticker: string, _exchangeCode?: string, companyName?: string) => {
+    setPendingSymbol(ticker);
+    const name = (companyName ?? "").trim();
+    setQuery(name ? `${name} (${ticker})` : ticker);
+    setHoverIndex(null);
+  };
+
+  const handleSearch = () => {
+    const direct = pendingSymbol.trim().toUpperCase();
+    if (direct) {
+      setSelectedSymbol(direct);
+      setIsStockView(true);
+      return;
+    }
+
+    const candidate = extractTickerFromQuery(query).trim().toUpperCase();
+    if (!candidate) {
+      return;
+    }
+
+    const match = stocks.find((stock) => stock.symbol?.toUpperCase() === candidate);
+    if (match?.symbol) {
+      setSelectedSymbol(match.symbol);
+      setPendingSymbol(match.symbol);
+      setIsStockView(true);
+    }
+  };
+
+  const handleBackToSearch = () => {
+    setIsStockView(false);
+    setSelectedSymbol("");
+    setHistorySeries([]);
+    setHoverIndex(null);
+  };
 
   useEffect(() => {
     let active = true;
@@ -133,8 +227,8 @@ export const ChartsPage = memo(function ChartsPage({
       setIsLoadingStocks(true);
       try {
         const results = await searchStocks({
-          exchange: selectedExchange,
-          q: query.trim() || undefined,
+          exchange: undefined, // default: all exchanges
+          q: effectiveSearchTerm.trim() || undefined,
         });
         if (!active) return;
         setStocks(results);
@@ -153,18 +247,23 @@ export const ChartsPage = memo(function ChartsPage({
       active = false;
       window.clearTimeout(timeout);
     };
-  }, [selectedExchange, query, priceRefreshVersion]);
+  }, [effectiveSearchTerm, priceRefreshVersion]);
 
   useEffect(() => {
     if (stocks.length === 0 || !query.trim()) {
-      setSelectedSymbol("");
+      if (!isStockView) {
+        setSelectedSymbol("");
+      }
+      setPendingSymbol("");
       return;
     }
     const hasCurrentSelection = stocks.some((stock) => stock.symbol === selectedSymbol);
     if (!hasCurrentSelection) {
-      setSelectedSymbol("");
+      if (!isStockView) {
+        setSelectedSymbol("");
+      }
     }
-  }, [selectedSymbol, stocks]);
+  }, [selectedSymbol, stocks, query, isStockView]);
 
   const selected = useMemo(
     () => stocks.find((stock) => stock.symbol === selectedSymbol),
@@ -276,18 +375,102 @@ export const ChartsPage = memo(function ChartsPage({
 
   return (
     <section className="ta-dashboard-content ta-charts-page">
+      {!isStockView ? (
+      <header className="ta-analysis-hero">
+        <h1 className="ta-analysis-title">Search and Analyze</h1>
+        <p className="ta-analysis-subtitle">Stock analysis and screening tool.</p>
+ 
+        <div className="ta-analysis-search-row">
+          <div className="ta-buy-search-input-wrap ta-analysis-search-input">
+            <span className="ta-buy-search-icon">⌕</span>
+            <input
+              className="ta-buy-search-input"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setSelectedSymbol("");
+                setPendingSymbol("");
+              }}
+              placeholder="Search for a company"
+            />
+            {query ? (
+              <button
+                type="button"
+                className="ta-buy-search-clear"
+                onClick={() => {
+                  setQuery("");
+                  setSelectedSymbol("");
+                  setPendingSymbol("");
+                  setHoverIndex(null);
+                }}
+                aria-label="Clear search"
+              >
+                x
+              </button>
+            ) : null}
+          </div>
+
+          <button
+            type="button"
+            className="ta-analysis-search-btn"
+            onClick={handleSearch}
+            disabled={!pendingSymbol.trim() && !query.trim()}
+          >
+            Search
+          </button>
+        </div>
+
+        {!isStockView && !pendingSymbol.trim() && effectiveSearchTerm.trim() && !selectedSymbol ? (
+          <div className="ta-analysis-dropdown" role="listbox" aria-label="Search suggestions">
+            {stocks.length > 0 ? (
+              stocks.slice(0, 8).map((stock) => (
+                <button
+                  key={`${stock.exchange}-${stock.symbol}`}
+                  type="button"
+                  className="ta-analysis-dropdown-item"
+                  onClick={() => handleSelectCandidate(stock.symbol, stock.exchange, stock.companyName)}
+                >
+                  <div className="ta-analysis-dropdown-left">
+                    <p className="ta-analysis-dropdown-name">{stock.companyName}</p>
+                    <p className="ta-analysis-dropdown-symbol">{stock.symbol}</p>
+                  </div>
+                  <span className="ta-analysis-dropdown-exchange">{stock.exchange}</span>
+                </button>
+              ))
+            ) : searchError ? (
+              <p className="ta-market-watch-note">{searchError}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {recommendationChips.length > 0 ? (
+          <div className="ta-analysis-reco">
+            <p className="ta-analysis-reco-label">Or analyze:</p>
+            <div className="ta-analysis-chips">
+              {recommendationChips.map((chip) => (
+                <button
+                  key={`${chip.exchangeCode ?? "NA"}-${chip.ticker}`}
+                  type="button"
+                  className="ta-analysis-chip"
+                  onClick={() => handleSelectCandidate(chip.ticker, chip.exchangeCode, chip.companyName)}
+                  title={chip.companyName ? `${chip.companyName} (${chip.ticker})` : chip.ticker}
+                >
+                  {formatChipLabel(chip)}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </header>
+      ) : null}
+      {false ? (
       <div className="ta-buy-search-card">
         <div className="ta-buy-search-row">
           <div className="ta-buy-select-wrap">
             <select
               className="ta-buy-select"
-              value={selectedExchange}
-              onChange={(event) => {
-                setSelectedExchange(event.target.value as ExchangeId);
-                setQuery("");
-                setSelectedSymbol("");
-                setHoverIndex(null);
-              }}
+              value={EXCHANGE_OPTIONS[0].id}
+              onChange={() => {}}
             >
               {EXCHANGE_OPTIONS.map((exchange) => (
                 <option key={exchange.id} value={exchange.id}>
@@ -326,40 +509,14 @@ export const ChartsPage = memo(function ChartsPage({
           </div>
         </div>
       </div>
-      {query.trim() && !selectedSymbol ? (
-        <div className="ta-watch-search-results">
-          {stocks.length > 0 ? (
-            stocks.slice(0, 12).map((stock) => (
-              <button
-                key={`${stock.exchange}-${stock.symbol}`}
-                type="button"
-                className="ta-watch-result-item"
-                onClick={() => {
-                  onOpenBuyStock?.({
-                    ticker: stock.symbol,
-                    companyName: stock.companyName,
-                    exchange: stock.exchange,
-                    currentPrice: stock.currentPrice,
-                  });
-                }}
-              >
-                <div>
-                  <p className="ta-watch-preview-symbol">{stock.symbol}</p>
-                  <p className="ta-watch-preview-name">{stock.companyName}</p>
-                </div>
-                <span className="ta-watch-result-exchange">{stock.exchange}</span>
-              </button>
-            ))
-          ) : searchError ? (
-            <p className="ta-market-watch-note">{searchError}</p>
-          ) : (
-            <p className="ta-market-watch-note">No matching stocks from backend.</p>
-          )}
-        </div>
       ) : null}
 
-      {selected ? (
+
+      {isStockView && selected ? (
         <article className="ta-dashboard-section-card ta-charts-shell">
+          <button type="button" className="ta-analysis-back-btn" onClick={handleBackToSearch}>
+            Back to search
+          </button>
           {!selected ? (
             <p className="ta-market-watch-note">
               {isLoadingStocks ? "Loading stocks..." : "No stocks returned from backend."}

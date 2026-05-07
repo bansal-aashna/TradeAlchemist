@@ -161,6 +161,8 @@ export const DashboardContent = memo(function DashboardContent({
         <ChartsPage
           priceRefreshVersion={priceRefreshVersion}
           onOpenBuyStock={onOpenBuyStock}
+          holdings={holdings}
+          watchlist={watchlist}
         />
       )}
     </>
