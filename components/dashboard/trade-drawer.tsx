@@ -18,7 +18,8 @@ type TradeDrawerProps = {
   onClose: () => void;
   onExecuteTrade?: (
     trade: { ticker: string; company: string; exchange: string; price: number; type: "buy" | "sell"; maxShares?: number },
-    shares: number
+    shares: number,
+    options?: { orderType?: "market" | "limit"; limitPrice?: number },
   ) => Promise<void>;
 };
 
@@ -39,7 +40,9 @@ export const TradeDrawer = memo(function TradeDrawer({
   onExecuteTrade,
 }: TradeDrawerProps) {
   const [tradeMode, setTradeMode] = useState<"buy" | "sell">("buy");
+  const [orderType, setOrderType] = useState<"market" | "limit">("market");
   const [shares, setShares] = useState("0");
+  const [limitPrice, setLimitPrice] = useState<string>("0");
   const [isTrading, setIsTrading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
@@ -48,7 +51,9 @@ export const TradeDrawer = memo(function TradeDrawer({
   useEffect(() => {
     if (stock) {
       setShares("0");
+      setLimitPrice(String(stock.currentPrice ?? 0));
       setMessage(null);
+      setOrderType("market");
       setTradeMode(stock.initialTradeMode ?? "buy");
       // Small delay so CSS transition fires
       const t = setTimeout(() => setVisible(true), 10);
@@ -59,7 +64,8 @@ export const TradeDrawer = memo(function TradeDrawer({
   }, [stock]);
 
   const ownedShares = holdings?.find((h) => h.ticker === stock?.ticker)?.quantity ?? 0;
-  const estimatedCost = (Number(shares) || 0) * (stock?.currentPrice ?? 0);
+  const activePrice = orderType === "limit" ? Number(limitPrice) || 0 : stock?.currentPrice ?? 0;
+  const estimatedCost = (Number(shares) || 0) * activePrice;
 
   function handleClose() {
     setVisible(false);
@@ -71,6 +77,10 @@ export const TradeDrawer = memo(function TradeDrawer({
     const qty = Number(shares);
     if (isNaN(qty) || qty <= 0) {
       setMessage("Enter a valid number of shares.");
+      return;
+    }
+    if (orderType === "limit" && activePrice <= 0) {
+      setMessage("Enter a valid limit price.");
       return;
     }
     if (tradeMode === "sell" && qty > ownedShares) {
@@ -89,9 +99,17 @@ export const TradeDrawer = memo(function TradeDrawer({
           type: tradeMode,
           maxShares: tradeMode === "sell" ? ownedShares : undefined,
         },
-        qty
+        qty,
+        {
+          orderType,
+          limitPrice: orderType === "limit" ? activePrice : undefined,
+        }
       );
-      setMessage(`${tradeMode === "buy" ? "Bought" : "Sold"} ${qty} share(s) of ${stock.ticker} ✓`);
+      setMessage(
+        orderType === "limit"
+          ? `Limit order placed for ${qty} share(s) of ${stock.ticker} ✓`
+          : `${tradeMode === "buy" ? "Bought" : "Sold"} ${qty} share(s) of ${stock.ticker} ✓`,
+      );
       setShares("0");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Trade failed.");
@@ -158,6 +176,23 @@ export const TradeDrawer = memo(function TradeDrawer({
           </button>
         </div>
 
+        <div className="ta-trade-order-mode">
+          <button
+            type="button"
+            className={`ta-trade-mode-btn ${orderType === "market" ? "active" : ""}`}
+            onClick={() => { setOrderType("market"); setMessage(null); }}
+          >
+            Market
+          </button>
+          <button
+            type="button"
+            className={`ta-trade-mode-btn ${orderType === "limit" ? "active" : ""}`}
+            onClick={() => { setOrderType("limit"); setMessage(null); }}
+          >
+            Limit
+          </button>
+        </div>
+
         {/* Shares input */}
         <div className="ta-trade-field" style={{ marginTop: "1rem" }}>
           <label className="ta-trade-field-label">Shares</label>
@@ -185,10 +220,26 @@ export const TradeDrawer = memo(function TradeDrawer({
           </div>
         </div>
 
+        {orderType === "limit" && (
+          <div className="ta-trade-field" style={{ marginTop: "1rem" }}>
+            <label className="ta-trade-field-label">Limit Price</label>
+            <div className="ta-trade-shares-row">
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className="ta-trade-shares-input"
+                value={limitPrice}
+                onChange={(e) => setLimitPrice(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Info rows */}
         <div className="ta-trade-info" style={{ marginTop: "1rem" }}>
           <div className="ta-trade-info-row">
-            <span>Estimated {tradeMode === "buy" ? "Cost" : "Proceeds"}:</span>
+            <span>{orderType === "limit" ? "Estimated Order Value" : `Estimated ${tradeMode === "buy" ? "Cost" : "Proceeds"}`}:</span>
             <span>{formatCurrency(estimatedCost)}</span>
           </div>
           <div className="ta-trade-info-row">
@@ -223,7 +274,13 @@ export const TradeDrawer = memo(function TradeDrawer({
           }
           onClick={handleTrade}
         >
-          {isTrading ? "Processing..." : tradeMode === "buy" ? "Place Buy Order" : "Place Sell Order"}
+          {isTrading
+            ? "Processing..."
+            : orderType === "limit"
+              ? `Place ${tradeMode === "buy" ? "Buy" : "Sell"} Limit`
+              : tradeMode === "buy"
+                ? "Place Buy Order"
+                : "Place Sell Order"}
         </button>
       </aside>
     </>

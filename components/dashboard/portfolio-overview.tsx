@@ -15,6 +15,8 @@ export type PortfolioHolding = {
   ticker: string;
   companyName?: string;
   exchange?: string;
+  sector?: string;
+  industry?: string;
   displayName?: string;
   quantity?: number;
   currentPrice?: number;
@@ -85,13 +87,7 @@ export const PortfolioOverview = memo(function PortfolioOverview({
         })}
       </div>
 
-      <div className="ta-holdings-wrap">
-        <h3 className="ta-holdings-title">Asset Allocation</h3>
-        <article className="ta-dashboard-section-card">
-          <AssetAllocationDonut holdings={holdings ?? []} />
-        </article>
-      </div>
-
+      <div className="ta-portfolio-holdings-layout">
       <div className="ta-holdings-wrap">
         <h3 className="ta-holdings-title">All Holdings</h3>
         <div className="ta-holdings-table-wrap">
@@ -182,6 +178,13 @@ export const PortfolioOverview = memo(function PortfolioOverview({
             </tbody>
           </table>
         </div>
+      </div>
+      <div className="ta-holdings-wrap ta-portfolio-sector-wrap">
+        <h3 className="ta-holdings-title">Asset Allocation</h3>
+        <article className="ta-portfolio-sector-card">
+          <AssetAllocationDonut holdings={holdings ?? []} groupBy="classification" />
+        </article>
+      </div>
       </div>
     </section>
   );

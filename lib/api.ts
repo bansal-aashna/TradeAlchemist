@@ -117,6 +117,8 @@ export type ApiHolding = {
   ticker: string;
   companyName?: string;
   exchange?: string;
+  sector?: string;
+  industry?: string;
   quantity?: number;
   currentPrice?: number;
   holdPrice?: number;
@@ -160,12 +162,17 @@ export type ExecuteTradeRequest = {
   symbol: string;
   exchange: string;
   quantity: number;
+  orderType?: "market" | "limit";
+  limitPrice?: number;
 };
 
 export type ApiTradeExecution = {
   trade?: Record<string, unknown>;
   portfolio?: ApiPortfolio | null;
   holdings?: ApiHolding[];
+  order?: Record<string, unknown>;
+  executed?: boolean;
+  message?: string;
 };
 
 async function fetchJson(path: string) {
@@ -390,6 +397,8 @@ function normalizeHoldingItem(item: Record<string, unknown>): ApiHolding | null 
     ticker,
     companyName: asString(item.companyName) ?? asString(item.company_name),
     exchange: asString(item.exchange),
+    sector: asString(item.sector),
+    industry: asString(item.industry),
     quantity: asNumber(item.quantity) ?? asNumber(item.shares),
     currentPrice: asNumber(item.currentPrice) ?? asNumber(item.current_price),
     holdPrice: asNumber(item.holdPrice) ?? asNumber(item.hold_price),
@@ -492,6 +501,12 @@ export async function getBackendHealth(): Promise<BackendHealth> {
       return { ok: false, source: "none", message: "Backend unreachable" };
     }
   }
+}
+
+export async function getLivePrices() {
+  const payload = await fetchJson("/prices/live");
+  const items = getArrayPayload(payload);
+  return items.map(normalizeStockItem).filter((item): item is ApiStock => item !== null);
 }
 
 export async function searchStocks(params: { exchange?: string; q?: string } = {}) {
@@ -620,6 +635,9 @@ export async function executeBuyTrade(token: string, request: ExecuteTradeReques
   const record = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
   return {
     trade: record?.trade && typeof record.trade === "object" ? record.trade as Record<string, unknown> : undefined,
+    order: record?.order && typeof record.order === "object" ? record.order as Record<string, unknown> : undefined,
+    executed: typeof record?.executed === "boolean" ? record.executed : true,
+    message: typeof record?.message === "string" ? record.message : undefined,
     portfolio:
       record?.portfolio && typeof record.portfolio === "object"
         ? (record.portfolio as ApiPortfolio)
@@ -639,6 +657,9 @@ export async function executeSellTrade(token: string, request: ExecuteTradeReque
   const record = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
   return {
     trade: record?.trade && typeof record.trade === "object" ? record.trade as Record<string, unknown> : undefined,
+    order: record?.order && typeof record.order === "object" ? record.order as Record<string, unknown> : undefined,
+    executed: typeof record?.executed === "boolean" ? record.executed : true,
+    message: typeof record?.message === "string" ? record.message : undefined,
     portfolio:
       record?.portfolio && typeof record.portfolio === "object"
         ? (record.portfolio as ApiPortfolio)

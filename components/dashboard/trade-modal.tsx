@@ -12,10 +12,16 @@ export type TradeDraft = {
   maxShares?: number;
 };
 
+export type TradeExecutionInput = {
+  shares: number;
+  orderType: "market" | "limit";
+  limitPrice?: number;
+};
+
 type TradeModalProps = {
   trade: TradeDraft;
   onCancel: () => void;
-  onConfirm: (shares: number) => void | Promise<void>;
+  onConfirm: (input: TradeExecutionInput) => void | Promise<void>;
   message?: string | null;
 };
 
@@ -32,12 +38,15 @@ function formatCurrency(value: number) {
 export function TradeModal({ trade, onCancel, onConfirm, message }: TradeModalProps) {
   const defaultShares = trade.type === "sell" ? Math.min(trade.maxShares ?? 1, 1) : 1;
   const [shares, setShares] = useState<number>(defaultShares);
+  const [orderType, setOrderType] = useState<"market" | "limit">("market");
+  const [limitPrice, setLimitPrice] = useState<number>(trade.price);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const safeShares = Number.isFinite(shares) && shares > 0 ? shares : 0;
+  const activePrice = orderType === "limit" ? limitPrice : trade.price;
 
-  const gross = useMemo(() => safeShares * trade.price, [safeShares, trade.price]);
+  const gross = useMemo(() => safeShares * activePrice, [activePrice, safeShares]);
   const feeAmount = useMemo(
     () => (trade.type === "sell" ? Math.abs(gross * feeRate) : 0),
     [gross, trade.type],
@@ -52,6 +61,10 @@ export function TradeModal({ trade, onCancel, onConfirm, message }: TradeModalPr
       setError("Enter at least 1 share.");
       return;
     }
+    if (orderType === "limit" && (!Number.isFinite(limitPrice) || limitPrice <= 0)) {
+      setError("Enter a valid limit price.");
+      return;
+    }
     if (trade.type === "sell" && trade.maxShares !== undefined && safeShares > trade.maxShares) {
       setError(`You can sell up to ${trade.maxShares} shares.`);
       return;
@@ -59,7 +72,11 @@ export function TradeModal({ trade, onCancel, onConfirm, message }: TradeModalPr
     setError(null);
     setIsSubmitting(true);
     try {
-      await onConfirm(safeShares);
+      await onConfirm({
+        shares: safeShares,
+        orderType,
+        limitPrice: orderType === "limit" ? limitPrice : undefined,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -105,6 +122,48 @@ export function TradeModal({ trade, onCancel, onConfirm, message }: TradeModalPr
             ) : null}
           </div>
         </div>
+        <div className="ta-trade-order-mode">
+          <button
+            type="button"
+            className={`ta-trade-mode-btn ${orderType === "market" ? "active" : ""}`}
+            onClick={() => {
+              setOrderType("market");
+              setError(null);
+            }}
+          >
+            Market
+          </button>
+          <button
+            type="button"
+            className={`ta-trade-mode-btn ${orderType === "limit" ? "active" : ""}`}
+            onClick={() => {
+              setOrderType("limit");
+              setError(null);
+            }}
+          >
+            Limit
+          </button>
+        </div>
+        {orderType === "limit" ? (
+          <div className="ta-trade-shares-row">
+            <label htmlFor="trade-limit-price" className="ta-trade-shares-label">
+              Limit Price
+            </label>
+            <div className="ta-trade-shares-input-wrap">
+              <input
+                id="trade-limit-price"
+                type="number"
+                min={0}
+                step="0.01"
+                value={limitPrice}
+                onChange={(event) => {
+                  setLimitPrice(Number(event.target.value));
+                  setError(null);
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
         {error ? <p className="ta-error">{error}</p> : null}
         {!error && message ? <p className="ta-error">{message}</p> : null}
 
@@ -122,7 +181,7 @@ export function TradeModal({ trade, onCancel, onConfirm, message }: TradeModalPr
             </p>
           ) : null}
           <p className="net">
-            <span>{trade.type === "sell" ? "Est. Net Credit" : "Est. Net Debit"}:</span>
+            <span>{orderType === "limit" ? "Est. Order Value" : trade.type === "sell" ? "Est. Net Credit" : "Est. Net Debit"}:</span>
             <strong>{formatCurrency(netAmount)}</strong>
           </p>
         </div>
@@ -139,7 +198,9 @@ export function TradeModal({ trade, onCancel, onConfirm, message }: TradeModalPr
           >
             {isSubmitting
               ? "Processing..."
-              : `${trade.type === "buy" ? "Buy" : "Sell"} ${safeShares} Shares`}
+              : orderType === "limit"
+                ? `Place ${trade.type === "buy" ? "Buy" : "Sell"} Limit`
+                : `${trade.type === "buy" ? "Buy" : "Sell"} ${safeShares} Shares`}
           </button>
         </div>
       </div>

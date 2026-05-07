@@ -1,33 +1,66 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import type { PortfolioHolding } from "@/components/dashboard/portfolio-overview";
 
 type DonutChartProps = {
   holdings: PortfolioHolding[];
+  groupBy?: "ticker" | "sector" | "classification";
 };
 
-const COLORS = [
-  "#1a73e8", "#34a853", "#fbbc04", "#ea4335",
-  "#673ab7", "#ff6d00", "#00bcd4", "#e91e63",
-  "#9c27b0", "#3f51b5", "#009688", "#cddc39"
+const GREEN_PALETTE = [
+  "#14532d",
+  "#166534",
+  "#15803d",
+  "#16a34a",
+  "#22c55e",
+  "#4ade80",
+  "#86efac",
+  "#bbf7d0",
 ];
 
-export function AssetAllocationDonut({ holdings }: DonutChartProps) {
+export function AssetAllocationDonut({ holdings, groupBy = "ticker" }: DonutChartProps) {
+  const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
   const data = useMemo(() => {
     if (!holdings || holdings.length === 0) return [];
 
+    const grouped = new Map<string, { value: number; kind: "sector" | "industry" | "holding" }>();
     let totalValue = 0;
-    const items = holdings.map((h) => {
-      const value = (h.quantity ?? 0) * (h.currentPrice ?? 0);
+
+    holdings.forEach((holding) => {
+      const value = (holding.quantity ?? 0) * (holding.currentPrice ?? 0);
+      if (value <= 0) {
+        return;
+      }
       totalValue += value;
-      return { ticker: h.ticker, value };
-    }).filter(h => h.value > 0);
+      const sector = holding.sector?.trim();
+      const industry = holding.industry?.trim();
+      const classificationLabel =
+        sector || industry || "Unassigned";
+      const kind =
+        sector ? "sector" : industry ? "industry" : "holding";
+
+      const label =
+        groupBy === "sector"
+          ? sector || "Unassigned"
+          : groupBy === "classification"
+            ? classificationLabel
+            : holding.ticker;
+
+      const existing = grouped.get(label);
+      grouped.set(label, {
+        value: (existing?.value ?? 0) + value,
+        kind: existing?.kind ?? kind,
+      });
+    });
+
+    const items = Array.from(grouped.entries())
+      .map(([label, meta]) => ({ label, value: meta.value, kind: meta.kind }))
+      .filter((item) => item.value > 0);
 
     if (totalValue === 0) return [];
 
-    // Sort by value descending
     items.sort((a, b) => b.value - a.value);
 
-    let offset = 25; // start at top
+    let offset = 25;
     return items.map((item, index) => {
       const percent = (item.value / totalValue) * 100;
       const strokeDashoffset = 100 - offset + 25;
@@ -36,11 +69,15 @@ export function AssetAllocationDonut({ holdings }: DonutChartProps) {
       return {
         ...item,
         percent,
-        color: COLORS[index % COLORS.length],
+        color: GREEN_PALETTE[index % GREEN_PALETTE.length],
         offset: strokeDashoffset
       };
     });
-  }, [holdings]);
+  }, [groupBy, holdings]);
+
+  const hoveredSlice = hoveredLabel
+    ? data.find((slice) => slice.label === hoveredLabel) ?? null
+    : null;
 
   if (data.length === 0) {
     return (
@@ -57,7 +94,7 @@ export function AssetAllocationDonut({ holdings }: DonutChartProps) {
           <circle cx="21" cy="21" r="15.91549431" fill="transparent" stroke="var(--border-light)" strokeWidth="6" />
           {data.map((slice) => (
             <circle
-              key={slice.ticker}
+              key={slice.label}
               cx="21"
               cy="21"
               r="15.91549431"
@@ -67,23 +104,24 @@ export function AssetAllocationDonut({ holdings }: DonutChartProps) {
               strokeDasharray={`${slice.percent} ${100 - slice.percent}`}
               strokeDashoffset={slice.offset}
               className="ta-donut-segment"
+              onMouseEnter={() => setHoveredLabel(slice.label)}
+              onMouseLeave={() => setHoveredLabel(null)}
             />
           ))}
         </svg>
-      </div>
-      <div className="ta-donut-legend">
-        {data.slice(0, 6).map((slice) => (
-          <div key={slice.ticker} className="ta-donut-legend-item">
-            <span className="ta-donut-legend-color" style={{ backgroundColor: slice.color }}></span>
-            <span className="ta-donut-legend-label">{slice.ticker}</span>
-            <span className="ta-donut-legend-value">{slice.percent.toFixed(1)}%</span>
+        {hoveredSlice ? (
+          <div className="ta-donut-center-label">
+            <p className="ta-donut-center-kind">
+              {hoveredSlice.kind === "sector"
+                ? "Sector"
+                : hoveredSlice.kind === "industry"
+                  ? "Industry"
+                  : "Holding"}
+            </p>
+            <p className="ta-donut-center-name">{hoveredSlice.label}</p>
+            <p className="ta-donut-center-value">{hoveredSlice.percent.toFixed(1)}%</p>
           </div>
-        ))}
-        {data.length > 6 && (
-          <div className="ta-donut-legend-item">
-            <span className="ta-donut-legend-label">Other...</span>
-          </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

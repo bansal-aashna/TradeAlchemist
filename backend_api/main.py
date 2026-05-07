@@ -15,13 +15,14 @@ from db.mongo_client import (
     live_prices,
     market_state,
     metadata,
+    orders,
     portfolios,
     holdings,
     transactions,
     users,
     watchlists,
 )
-from trade_executor import execute_trade
+from trade_executor import execute_trade, place_limit_order, process_limit_orders
 from auth_utils import get_current_user
 from simulator_tick import run_price_tick
 
@@ -34,7 +35,7 @@ PRICE_TICKER_TASK = None
 async def price_ticker_loop():
     while True:
         try:
-            summary = await asyncio.to_thread(run_price_tick)
+            summary = await asyncio.to_thread(run_simulation_cycle)
             print(
                 "Price tick complete | "
                 f"Updated {summary['updated']} stocks | State {summary['state']}"
@@ -63,6 +64,12 @@ def stop_price_ticker():
         return False
     PRICE_TICKER_TASK.cancel()
     return True
+
+
+def run_simulation_cycle():
+    tick_summary = run_price_tick()
+    order_summary = process_limit_orders()
+    return {**tick_summary, "limitOrders": order_summary}
 
 
 @asynccontextmanager
@@ -253,6 +260,8 @@ def build_holdings_snapshot(uid: str, display_name: str):
                 "ticker": ticker,
                 "companyName": meta.get("companyName") or meta.get("company_name") or ticker,
                 "exchange": row["exchange"] or meta.get("exchange") or "",
+                "sector": meta.get("sector") or "",
+                "industry": meta.get("industry") or "",
                 "quantity": current_quantity,
                 "holdPrice": hold_price,
                 "currentPrice": round(current_price, 2),
@@ -619,7 +628,7 @@ def get_simulation_status():
 
 @app.post("/simulation/tick")
 def run_simulation_tick():
-    return {"status": "ok", "data": run_price_tick()}
+    return {"status": "ok", "data": run_simulation_cycle()}
 
 
 @app.post("/simulation/start")
@@ -666,20 +675,39 @@ class TradeRequest(BaseModel):
     symbol: str
     exchange: str
     quantity: int
+    orderType: Optional[str] = "market"
+    limitPrice: Optional[float] = None
 
 
 @app.post("/trade/buy")
 def buy_trade(req: TradeRequest, current_user: dict = Depends(get_current_user)):
     display_name = get_user_display_name(current_user)
     try:
-        trade = execute_trade(
-            current_user["uid"],
-            display_name,
-            req.symbol,
-            req.exchange,
-            "BUY",
-            req.quantity
-        )
+        order_type = (req.orderType or "market").strip().lower()
+        if order_type == "limit":
+            result = place_limit_order(
+                current_user["uid"],
+                display_name,
+                req.symbol,
+                req.exchange,
+                "BUY",
+                req.quantity,
+                req.limitPrice,
+            )
+            trade = result.get("trade")
+            order = result.get("order")
+            executed = bool(result.get("executed"))
+        else:
+            trade = execute_trade(
+                current_user["uid"],
+                display_name,
+                req.symbol,
+                req.exchange,
+                "BUY",
+                req.quantity
+            )
+            order = None
+            executed = True
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     portfolio_doc, holdings_docs = sync_portfolio_snapshot(current_user["uid"], display_name)
@@ -689,6 +717,9 @@ def buy_trade(req: TradeRequest, current_user: dict = Depends(get_current_user))
             "status": "ok",
             "data": {
                 "trade": trade,
+                "order": order,
+                "executed": executed,
+                "message": "Limit order placed successfully." if not executed else "Trade executed successfully.",
                 "portfolio": portfolio_doc,
                 "holdings": holdings_docs,
             }
@@ -700,14 +731,31 @@ def buy_trade(req: TradeRequest, current_user: dict = Depends(get_current_user))
 def sell_trade(req: TradeRequest, current_user: dict = Depends(get_current_user)):
     display_name = get_user_display_name(current_user)
     try:
-        trade = execute_trade(
-            current_user["uid"],
-            display_name,
-            req.symbol,
-            req.exchange,
-            "SELL",
-            req.quantity
-        )
+        order_type = (req.orderType or "market").strip().lower()
+        if order_type == "limit":
+            result = place_limit_order(
+                current_user["uid"],
+                display_name,
+                req.symbol,
+                req.exchange,
+                "SELL",
+                req.quantity,
+                req.limitPrice,
+            )
+            trade = result.get("trade")
+            order = result.get("order")
+            executed = bool(result.get("executed"))
+        else:
+            trade = execute_trade(
+                current_user["uid"],
+                display_name,
+                req.symbol,
+                req.exchange,
+                "SELL",
+                req.quantity
+            )
+            order = None
+            executed = True
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     portfolio_doc, holdings_docs = sync_portfolio_snapshot(current_user["uid"], display_name)
@@ -717,6 +765,9 @@ def sell_trade(req: TradeRequest, current_user: dict = Depends(get_current_user)
             "status": "ok",
             "data": {
                 "trade": trade,
+                "order": order,
+                "executed": executed,
+                "message": "Limit order placed successfully." if not executed else "Trade executed successfully.",
                 "portfolio": portfolio_doc,
                 "holdings": holdings_docs,
             }

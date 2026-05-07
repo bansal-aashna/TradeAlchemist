@@ -1072,6 +1072,84 @@ select:focus-visible {
   gap: 0.3rem;
 }
 
+/* ===== LIVE TICKER TAPE ===== */
+.ta-ticker-tape {
+  border-bottom: var(--border-thin) solid var(--border-light);
+  background: color-mix(in srgb, var(--bg-topbar) 88%, var(--bg-content) 12%);
+  overflow: hidden;
+}
+
+.ta-ticker-tape-mask {
+  width: 100%;
+  overflow: hidden;
+}
+
+.ta-ticker-tape-track {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: max-content;
+  padding: 0.55rem 0;
+  animation: ta-ticker-marquee 44s linear infinite;
+}
+
+.ta-ticker-tape:hover .ta-ticker-tape-track {
+  animation-play-state: paused;
+}
+
+.ta-ticker-tape-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  padding-right: 0.85rem;
+  border-right: var(--border-thin) solid var(--border-light);
+}
+
+.ta-ticker-tape-symbol {
+  font-size: var(--text-sm);
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+}
+
+.ta-ticker-tape-price {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ta-ticker-tape-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.ta-ticker-tape-change.positive {
+  color: var(--accent-secondary);
+}
+
+.ta-ticker-tape-change.negative {
+  color: var(--danger-primary);
+}
+
+.ta-ticker-tape-arrow {
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+@keyframes ta-ticker-marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 /* ===== DASHBOARD CONTENT ===== */
 .ta-dashboard-content {
   padding: 0.9rem 1rem;
@@ -1320,6 +1398,31 @@ select:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+}
+
+.ta-trade-order-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.ta-trade-mode-btn {
+  border: var(--border-thin) solid var(--border-light);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 999px;
+  min-height: 36px;
+  padding: 0.4rem 0.7rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.ta-trade-mode-btn.active {
+  background: color-mix(in srgb, var(--border-light) 70%, transparent);
+  color: var(--text-primary);
+  border-color: var(--border-light);
 }
 
 .ta-trade-field-label {
@@ -2607,6 +2710,37 @@ button.ta-watch-result-item {
   margin-top: 0.8rem;
 }
 
+.ta-portfolio-holdings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.ta-portfolio-sector-wrap {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ta-portfolio-sector-wrap .ta-holdings-title {
+  width: 100%;
+  text-align: center;
+  margin-bottom: 0.45rem;
+}
+
+.ta-portfolio-sector-card {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.25rem 0.25rem;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
 .ta-holdings-title {
   margin: 0 0 0.2rem;
   font-size: var(--text-7xl);
@@ -2793,6 +2927,16 @@ button.ta-watch-result-item {
 }
 
 /* ===== MEDIA QUERIES ===== */
+@media (max-width: 1200px) {
+  .ta-portfolio-holdings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .ta-portfolio-sector-card {
+    aspect-ratio: auto;
+  }
+}
+
 /* ===== SYSTEM PREFERENCE-BASE THEME ===== */
 @media (prefers-color-scheme: light) {
   html:not([data-theme]) {
@@ -3219,22 +3363,27 @@ button.ta-watch-result-item {
 /* ===== DONUT CHART ===== */
 .ta-donut-container {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 2rem;
-  margin-top: 1rem;
+  justify-content: center;
+  gap: 0.9rem;
+  width: 100%;
+  height: 100%;
+  margin-top: 0;
 }
 
 .ta-donut-empty {
   color: var(--text-muted);
   font-size: 0.95rem;
-  padding: 2rem 0;
+  padding: 1rem 0;
   text-align: center;
 }
 
 .ta-donut-chart {
-  width: 140px;
-  height: 140px;
+  width: min(170px, 100%);
+  height: min(170px, 100%);
   flex-shrink: 0;
+  position: relative;
 }
 
 .ta-donut-svg {
@@ -3244,36 +3393,45 @@ button.ta-watch-result-item {
 }
 
 .ta-donut-segment {
-  transition: stroke-dasharray 0.5s ease-in-out;
+  transition: stroke-dasharray 0.5s ease-in-out, opacity 0.2s ease;
+  cursor: pointer;
 }
 
-.ta-donut-legend {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  flex: 1;
+.ta-donut-segment:hover {
+  opacity: 0.88;
 }
 
-.ta-donut-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
+.ta-donut-center-label {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  width: 68%;
+  text-align: center;
+  pointer-events: none;
+}
+
+.ta-donut-center-kind {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  line-height: 1.1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.ta-donut-center-name {
+  margin: 0;
   font-size: 0.95rem;
-}
-
-.ta-donut-legend-color {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.ta-donut-legend-label {
-  color: var(--text-secondary);
-  font-weight: 500;
-  flex: 1;
-}
-
-.ta-donut-legend-value {
+  line-height: 1.18;
   color: var(--text-primary);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.ta-donut-center-value {
+  margin: 0.28rem 0 0;
+  font-size: 0.9rem;
+  color: var(--accent-secondary);
   font-weight: 700;
 }

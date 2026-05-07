@@ -33,7 +33,11 @@ type DashboardContentProps = {
   transactions: TransactionRecord[];
   watchlist: ApiWatchlistItem[];
   onTradeAction: (trade: TradeDraft) => void;
-  onExecuteTrade: (trade: TradeDraft, shares: number) => Promise<void>;
+  onExecuteTrade: (
+    trade: TradeDraft,
+    shares: number,
+    options?: { orderType?: "market" | "limit"; limitPrice?: number },
+  ) => Promise<void>;
   onAddWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onRemoveWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onPreviewNavigate: (tab: DashboardTab) => void;
@@ -71,9 +75,10 @@ export const DashboardContent = memo(function DashboardContent({
   // Wrap onExecuteTrade to accept TradeDraft-like signature from the drawer
   async function handleDrawerTrade(
     trade: { ticker: string; company: string; exchange: string; price: number; type: "buy" | "sell"; maxShares?: number },
-    shares: number
+    shares: number,
+    options?: { orderType?: "market" | "limit"; limitPrice?: number },
   ) {
-    await onExecuteTrade(trade as TradeDraft, shares);
+    await onExecuteTrade(trade as TradeDraft, shares, options);
   }
 
   return (

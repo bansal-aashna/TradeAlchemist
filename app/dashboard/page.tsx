@@ -8,17 +8,24 @@ import {
   type PortfolioHolding,
   type PortfolioMetrics,
 } from "@/components/dashboard/portfolio-overview";
-import { TradeModal, type TradeDraft } from "@/components/dashboard/trade-modal";
+import {
+  TradeModal,
+  type TradeDraft,
+  type TradeExecutionInput,
+} from "@/components/dashboard/trade-modal";
 import type { TransactionRecord } from "@/components/dashboard/transaction-history-table";
 import { DashboardTopbar } from "@/components/dashboard/dashboard-topbar";
+import { StockTickerTape } from "@/components/dashboard/stock-ticker-tape";
 import { type DashboardTab } from "@/components/dashboard/tabs";
 import { auth } from "@/lib/firebase";
 import {
   addWatchlistItem,
   type ApiPortfolio,
+  type ApiStock,
   executeBuyTrade,
   executeSellTrade,
   getBackendHealth,
+  getLivePrices,
   getSimulationStatus,
   initCurrentUser,
   getHoldings,
@@ -49,6 +56,8 @@ function mapHolding(holding: Awaited<ReturnType<typeof getHoldings>>[number]): P
     ticker: holding.ticker,
     companyName: holding.companyName,
     exchange: holding.exchange,
+    sector: holding.sector,
+    industry: holding.industry,
     displayName: holding.displayName,
     quantity: holding.quantity,
     currentPrice: holding.currentPrice,
@@ -155,6 +164,43 @@ export default function DashboardPage() {
   const [isAutoTickerEnabled, setIsAutoTickerEnabled] = useState(false);
   const [isTogglingTicker, setIsTogglingTicker] = useState(false);
   const [buyNavigationStock, setBuyNavigationStock] = useState<BuyNavigationTarget | null>(null);
+  const [tickerTapeStocks, setTickerTapeStocks] = useState<ApiStock[]>([]);
+
+  const fallbackTickerTapeStocks = useMemo<ApiStock[]>(() => {
+    if (watchlist.length > 0) {
+      return watchlist.map((item) => ({
+        symbol: item.ticker,
+        companyName: item.companyName,
+        exchange: item.exchange,
+        currentPrice: item.currentPrice,
+        percentChange: item.percentChange,
+        change: item.change,
+      }));
+    }
+
+    return holdings
+      .filter((holding) => holding.currentPrice !== undefined)
+      .map((holding) => ({
+        symbol: holding.ticker,
+        companyName: holding.companyName ?? holding.ticker,
+        exchange: holding.exchange ?? "",
+        currentPrice: holding.currentPrice,
+      }));
+  }, [holdings, watchlist]);
+
+  const mergedTickerTapeStocks = useMemo<ApiStock[]>(() => {
+    const combined = [...tickerTapeStocks, ...fallbackTickerTapeStocks];
+    const seen = new Set<string>();
+
+    return combined.filter((stock) => {
+      const key = `${stock.exchange ?? ""}::${stock.symbol}`;
+      if (!stock.symbol || stock.currentPrice === undefined || seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  }, [fallbackTickerTapeStocks, tickerTapeStocks]);
 
   const handleLogout = useCallback(async () => {
     await signOut(auth);
@@ -322,7 +368,11 @@ export default function DashboardPage() {
   }, []);
 
   const handleExecuteTrade = useCallback(
-    async (trade: TradeDraft, shares: number) => {
+    async (
+      trade: TradeDraft,
+      shares: number,
+      options?: { orderType?: "market" | "limit"; limitPrice?: number },
+    ) => {
       setTradeMessage(null);
 
       if (trade.type === "sell") {
@@ -352,6 +402,8 @@ export default function DashboardPage() {
           symbol: trade.ticker,
           exchange: trade.exchange,
           quantity: shares,
+          orderType: options?.orderType ?? "market",
+          limitPrice: options?.limitPrice,
         };
         const tradeResult =
           trade.type === "buy"
@@ -360,6 +412,7 @@ export default function DashboardPage() {
 
         const immediatePortfolio = tradeResult.portfolio;
         const immediateHoldings = tradeResult.holdings ?? [];
+        const wasExecuted = tradeResult.executed !== false;
 
         if (immediatePortfolio) {
           setBuyingPower(immediatePortfolio.buyingPower ?? INITIAL_BUYING_POWER);
@@ -381,7 +434,7 @@ export default function DashboardPage() {
         setBuyingPower(portfolio?.buyingPower ?? INITIAL_BUYING_POWER);
         setTotalPortfolioValue(portfolio?.totalPortfolioValue ?? INITIAL_BUYING_POWER);
         setPortfolioSnapshot(mapPortfolioMetrics(portfolio));
-        setTradeMessage(null);
+        setTradeMessage(wasExecuted ? null : tradeResult.message ?? "Limit order placed successfully.");
         setActiveTrade(null);
       } catch (error) {
         setTradeMessage(error instanceof Error ? error.message : "Trade execution failed.");
@@ -391,9 +444,12 @@ export default function DashboardPage() {
   );
 
   const handleTradeConfirm = useCallback(
-    async (shares: number) => {
+    async (input: TradeExecutionInput) => {
       if (!activeTrade) return;
-      await handleExecuteTrade(activeTrade, shares);
+      await handleExecuteTrade(activeTrade, input.shares, {
+        orderType: input.orderType,
+        limitPrice: input.limitPrice,
+      });
     },
     [activeTrade, handleExecuteTrade],
   );
@@ -456,6 +512,31 @@ export default function DashboardPage() {
       buyingPower: portfolioMetrics.buyingPower ?? DEFAULT_PORTFOLIO_SNAPSHOT.buyingPower,
     });
   }, [portfolioMetrics]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadTickerTape = async () => {
+      try {
+        const data = await getLivePrices();
+        if (!isMounted) {
+          return;
+        }
+        setTickerTapeStocks(data);
+      } catch {
+        if (!isMounted) {
+          return;
+        }
+        setTickerTapeStocks([]);
+      }
+    };
+
+    void loadTickerTape();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [priceRefreshVersion]);
 
   useEffect(() => {
     let isMounted = true;
@@ -581,6 +662,7 @@ export default function DashboardPage() {
         onAutoTickerToggle={handleAutoTickerToggle}
         onRefreshPrices={handleRefreshPrices}
       />
+      <StockTickerTape stocks={mergedTickerTapeStocks} />
       <DashboardContent
         activeTab={activeTab}
         portfolioMetrics={portfolioMetrics}

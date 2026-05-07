@@ -20,7 +20,11 @@ type DashboardHomeProps = {
   isDarkMode: boolean;
   buyingPower?: number;
   onTradeAction: (trade: TradeDraft) => void;
-  onExecuteTrade?: (trade: TradeDraft, shares: number) => Promise<void>;
+  onExecuteTrade?: (
+    trade: TradeDraft,
+    shares: number,
+    options?: { orderType?: "market" | "limit"; limitPrice?: number },
+  ) => Promise<void>;
   onAddWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onRemoveWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onPreviewNavigate: (tab: DashboardTab) => void;
@@ -145,7 +149,9 @@ export const DashboardHome = memo(function DashboardHome({
   const [selectedSymbol, setSelectedSymbol] = useState("");
   const [searchError, setSearchError] = useState<string | null>(null);
   const [tradeMode, setTradeMode] = useState<"buy" | "sell">("buy");
+  const [orderType, setOrderType] = useState<"market" | "limit">("market");
   const [shares, setShares] = useState<string>("0");
+  const [limitPrice, setLimitPrice] = useState<string>("0");
   const [isTrading, setIsTrading] = useState(false);
 
   const [activeRange, setActiveRange] = useState<RangeOption>("1Y");
@@ -208,6 +214,7 @@ export const DashboardHome = memo(function DashboardHome({
     () => filteredStocks.find((stock) => stock.symbol === selectedSymbol),
     [filteredStocks, selectedSymbol],
   );
+  const tradePrice = orderType === "limit" ? Number(limitPrice) || 0 : selectedStock?.currentPrice ?? 0;
   const stockCurrency = selectedStock?.currency ?? "USD";
   const recentTransactions = transactions.slice(0, 5);
   const previewHoldings = holdings?.slice(0, 5) ?? [];
@@ -240,6 +247,12 @@ export const DashboardHome = memo(function DashboardHome({
       active = false;
     };
   }, [selectedStock?.symbol, activeRange, priceRefreshVersion]);
+
+  useEffect(() => {
+    if (selectedStock?.currentPrice !== undefined) {
+      setLimitPrice(String(selectedStock.currentPrice));
+    }
+  }, [selectedStock?.currentPrice]);
 
   const chartRangeSeries = useMemo(
     () => getSeriesByRange(historySeries, activeRange),
@@ -512,6 +525,23 @@ export const DashboardHome = memo(function DashboardHome({
                 </button>
               </div>
 
+              <div className="ta-trade-order-mode">
+                <button
+                  type="button"
+                  className={`ta-trade-mode-btn ${orderType === "market" ? "active" : ""}`}
+                  onClick={() => setOrderType("market")}
+                >
+                  Market
+                </button>
+                <button
+                  type="button"
+                  className={`ta-trade-mode-btn ${orderType === "limit" ? "active" : ""}`}
+                  onClick={() => setOrderType("limit")}
+                >
+                  Limit
+                </button>
+              </div>
+
               {/* Shares input */}
               <div className="ta-trade-field">
                 <label className="ta-trade-field-label">Shares</label>
@@ -541,11 +571,27 @@ export const DashboardHome = memo(function DashboardHome({
                 </div>
               </div>
 
+              {orderType === "limit" ? (
+                <div className="ta-trade-field">
+                  <label className="ta-trade-field-label">Limit Price</label>
+                  <div className="ta-trade-shares-row">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="ta-trade-shares-input"
+                      value={limitPrice}
+                      onChange={(e) => setLimitPrice(e.target.value)}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
               {/* Estimated cost & buying power */}
               <div className="ta-trade-info">
                 <div className="ta-trade-info-row">
-                  <span>Estimated Cost:</span>
-                  <span>{formatCurrencyByCode((Number(shares) || 0) * (selectedStock.currentPrice ?? 0), stockCurrency)}</span>
+                  <span>{orderType === "limit" ? "Estimated Order Value:" : "Estimated Cost:"}</span>
+                  <span>{formatCurrencyByCode((Number(shares) || 0) * tradePrice, stockCurrency)}</span>
                 </div>
                 <div className="ta-trade-info-row">
                   <span>Buying Power:</span>
@@ -559,7 +605,7 @@ export const DashboardHome = memo(function DashboardHome({
                 className={`ta-trade-cta-btn ${tradeMode}`}
                 disabled={
                   isTrading ||
-                  !selectedStock.currentPrice ||
+                  !(orderType === "limit" ? tradePrice > 0 : selectedStock.currentPrice) ||
                   Number(shares) <= 0 ||
                   (tradeMode === 'sell' && Number(shares) > (holdings?.find(h => h.ticker === selectedStock.symbol)?.quantity ?? 0))
                 }
@@ -573,9 +619,23 @@ export const DashboardHome = memo(function DashboardHome({
                     if (tradeMode === 'sell') {
                       const maxShares = holdings?.find(h => h.ticker === selectedStock.symbol)?.quantity ?? 0;
                       if (maxShares <= 0 || qty > maxShares) return;
-                      await onExecuteTrade({ ticker: selectedStock.symbol, company: selectedStock.companyName, exchange: selectedStock.exchange, price: selectedStock.currentPrice, type: 'sell', maxShares }, qty);
+                      await onExecuteTrade(
+                        { ticker: selectedStock.symbol, company: selectedStock.companyName, exchange: selectedStock.exchange, price: selectedStock.currentPrice, type: 'sell', maxShares },
+                        qty,
+                        {
+                          orderType,
+                          limitPrice: orderType === "limit" ? tradePrice : undefined,
+                        },
+                      );
                     } else {
-                      await onExecuteTrade({ ticker: selectedStock.symbol, company: selectedStock.companyName, exchange: selectedStock.exchange, price: selectedStock.currentPrice, type: 'buy' }, qty);
+                      await onExecuteTrade(
+                        { ticker: selectedStock.symbol, company: selectedStock.companyName, exchange: selectedStock.exchange, price: selectedStock.currentPrice, type: 'buy' },
+                        qty,
+                        {
+                          orderType,
+                          limitPrice: orderType === "limit" ? tradePrice : undefined,
+                        },
+                      );
                     }
                     
                     // Reset shares after successful trade
@@ -585,7 +645,11 @@ export const DashboardHome = memo(function DashboardHome({
                   }
                 }}
               >
-                {isTrading ? 'Processing...' : (tradeMode === 'buy' ? 'Place Buy Order' : 'Place Sell Order')}
+                {isTrading
+                  ? 'Processing...'
+                  : orderType === "limit"
+                    ? `Place ${tradeMode === 'buy' ? 'Buy' : 'Sell'} Limit`
+                    : (tradeMode === 'buy' ? 'Place Buy Order' : 'Place Sell Order')}
               </button>
 
               {/* Add to watchlist moved */}
@@ -629,6 +693,17 @@ export const DashboardHome = memo(function DashboardHome({
             </article>
           </div>
         )}
+
+        <article className="ta-dashboard-section-card">
+          <button
+            type="button"
+            className="ta-preview-link"
+            onClick={() => onPreviewNavigate("Portfolio")}
+          >
+            <h3 className="ta-holdings-title">Asset Allocation</h3>
+          </button>
+          <AssetAllocationDonut holdings={holdings ?? []} groupBy="classification" />
+        </article>
 
         </div> {/* Close ta-dh-left */}
 
@@ -709,18 +784,6 @@ export const DashboardHome = memo(function DashboardHome({
                 </tbody>
               </table>
             </div>
-          </article>
-
-          {/* Asset Allocation */}
-          <article className="ta-dashboard-section-card">
-            <button
-              type="button"
-              className="ta-preview-link"
-              onClick={() => onPreviewNavigate("Portfolio")}
-            >
-              <h3 className="ta-holdings-title">Asset Allocation</h3>
-            </button>
-            <AssetAllocationDonut holdings={holdings ?? []} />
           </article>
 
           {/* Portfolio Holdings */}
