@@ -43,6 +43,7 @@ export type ApiStock = {
   sector?: string;
   industry?: string;
   currency?: string;
+  fxRateToUsd?: number | null;
   startDate?: string;
   endDate?: string;
   numRows?: number;
@@ -56,6 +57,7 @@ export type ApiStock = {
   fiftyTwoWeekHigh?: number;
   fiftyTwoWeekLow?: number;
   currentPrice?: number;
+  currentPriceUsd?: number;
   change?: number;
   percentChange?: number;
   open?: number;
@@ -123,6 +125,10 @@ export type ApiHolding = {
   currentPrice?: number;
   holdPrice?: number;
   totalPL?: number;
+  currency?: string;
+  fxRateToUsd?: number;
+  currentPriceNative?: number | null;
+  holdPriceNative?: number | null;
   updatedAt?: string;
 };
 
@@ -132,7 +138,10 @@ export type ApiWatchlistItem = {
   ticker: string;
   companyName: string;
   exchange: string;
+  currency?: string;
+  fxRateToUsd?: number | null;
   currentPrice?: number;
+  currentPriceUsd?: number;
   prevClose?: number;
   change?: number;
   percentChange?: number;
@@ -156,6 +165,10 @@ export type ApiTransaction = {
   totalValue?: number;
   dateTime: string;
   realisedPL?: number;
+  currency?: string;
+  fxRateToUsd?: number | null;
+  priceNative?: number;
+  priceUsd?: number;
 };
 
 export type ExecuteTradeRequest = {
@@ -313,6 +326,7 @@ function normalizeStockItem(item: Record<string, unknown>): ApiStock | null {
     sector: asString(item.sector),
     industry: asString(item.industry),
     currency: asString(item.currency),
+    fxRateToUsd: asNumber(item.fxRateToUsd) ?? asNumber(item.fx_rate_to_usd),
     startDate: asString(item.startDate) ?? asString(item.start_date),
     endDate: asString(item.endDate) ?? asString(item.end_date),
     numRows: asNumber(item.numRows) ?? asNumber(item.num_rows),
@@ -331,6 +345,7 @@ function normalizeStockItem(item: Record<string, unknown>): ApiStock | null {
       asNumber(item.lastPrice) ??
       asNumber(item.last_price) ??
       asNumber(item.close),
+    currentPriceUsd: asNumber(item.currentPriceUsd) ?? asNumber(item.priceUsd) ?? asNumber(item.price_usd),
     change: asNumber(item.change),
     percentChange:
       asNumber(item.percentChange) ??
@@ -403,6 +418,10 @@ function normalizeHoldingItem(item: Record<string, unknown>): ApiHolding | null 
     currentPrice: asNumber(item.currentPrice) ?? asNumber(item.current_price),
     holdPrice: asNumber(item.holdPrice) ?? asNumber(item.hold_price),
     totalPL: asNumber(item.totalPL) ?? asNumber(item.total_pl),
+    currency: asString(item.currency),
+    fxRateToUsd: asNumber(item.fxRateToUsd) ?? asNumber(item.fx_rate_to_usd),
+    currentPriceNative: asNumber(item.currentPriceNative) ?? asNumber(item.current_price_native),
+    holdPriceNative: asNumber(item.holdPriceNative) ?? asNumber(item.hold_price_native),
     updatedAt: asString(item.updatedAt) ?? asString(item.updated_at),
   };
 }
@@ -423,10 +442,13 @@ function normalizeWatchlistItem(item: Record<string, unknown>): ApiWatchlistItem
     ticker,
     companyName,
     exchange,
+    currency: asString(item.currency),
+    fxRateToUsd: asNumber(item.fxRateToUsd) ?? asNumber(item.fx_rate_to_usd),
     currentPrice:
       asNumber(item.currentPrice) ??
       asNumber(item.current_price) ??
       asNumber(item.price),
+    currentPriceUsd: asNumber(item.currentPriceUsd) ?? asNumber(item.priceUsd) ?? asNumber(item.price_usd),
     prevClose: asNumber(item.prevClose) ?? asNumber(item.previousClose),
     change: asNumber(item.change),
     percentChange: asNumber(item.percentChange) ?? asNumber(item.pctChange),
@@ -464,6 +486,10 @@ function normalizeTransactionItem(item: Record<string, unknown>): ApiTransaction
     type: type.toLowerCase() === "sell" ? "sell" : "buy",
     shares,
     price,
+    currency: asString(item.currency),
+    fxRateToUsd: asNumber(item.fxRateToUsd) ?? asNumber(item.fx_rate_to_usd),
+    priceNative: asNumber(item.priceNative) ?? asNumber(item.price_native),
+    priceUsd: asNumber(item.priceUsd) ?? asNumber(item.price_usd),
     totalValue:
       asNumber(item.totalValue) ??
       asNumber(item.total_value) ??
