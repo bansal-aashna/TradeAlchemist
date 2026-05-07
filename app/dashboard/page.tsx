@@ -78,6 +78,9 @@ function mapTransaction(
     type: transaction.type,
     shares: transaction.shares,
     price: transaction.price,
+    currency: transaction.currency,
+    priceNative: transaction.priceNative,
+    priceUsd: transaction.priceUsd,
     realisedPL: transaction.realisedPL,
   };
 }
