@@ -1,6 +1,7 @@
 import { memo } from "react";
 import type { TradeDraft } from "@/components/dashboard/trade-modal";
 import type { TradeDrawerStock } from "@/components/dashboard/trade-drawer";
+import { AssetAllocationDonut } from "./donut-chart";
 
 export type PortfolioMetrics = {
   totalPortfolioValue?: number;
@@ -82,6 +83,13 @@ export const PortfolioOverview = memo(function PortfolioOverview({
             </article>
           );
         })}
+      </div>
+
+      <div className="ta-holdings-wrap">
+        <h3 className="ta-holdings-title">Asset Allocation</h3>
+        <article className="ta-dashboard-section-card">
+          <AssetAllocationDonut holdings={holdings ?? []} />
+        </article>
       </div>
 
       <div className="ta-holdings-wrap">

@@ -514,8 +514,8 @@ export const ChartsPage = memo(function ChartsPage({
 
       {isStockView && selected ? (
         <article className="ta-dashboard-section-card ta-charts-shell">
-          <button type="button" className="ta-analysis-back-btn" onClick={handleBackToSearch}>
-            Back to search
+          <button type="button" className="ta-analysis-back-btn" onClick={handleBackToSearch} aria-label="Back to search">
+            ←
           </button>
           {!selected ? (
             <p className="ta-market-watch-note">

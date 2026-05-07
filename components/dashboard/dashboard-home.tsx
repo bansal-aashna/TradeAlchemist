@@ -6,6 +6,7 @@ import type { TradeDraft } from "@/components/dashboard/trade-modal";
 import type { TransactionRecord } from "@/components/dashboard/transaction-history-table";
 import { searchStocks, getStockHistory, type ApiOHLCPoint, type ApiStock, type ApiWatchlistItem } from "@/lib/api";
 import type { TradeDrawerStock } from "@/components/dashboard/trade-drawer";
+import { AssetAllocationDonut } from "./donut-chart";
 
 const rangeOptions = ["1D", "5D", "1M", "6M", "YTD", "1Y"] as const;
 type RangeOption = (typeof rangeOptions)[number];
@@ -708,6 +709,18 @@ export const DashboardHome = memo(function DashboardHome({
                 </tbody>
               </table>
             </div>
+          </article>
+
+          {/* Asset Allocation */}
+          <article className="ta-dashboard-section-card">
+            <button
+              type="button"
+              className="ta-preview-link"
+              onClick={() => onPreviewNavigate("Portfolio")}
+            >
+              <h3 className="ta-holdings-title">Asset Allocation</h3>
+            </button>
+            <AssetAllocationDonut holdings={holdings ?? []} />
           </article>
 
           {/* Portfolio Holdings */}
