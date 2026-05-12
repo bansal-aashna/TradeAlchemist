@@ -2,9 +2,10 @@
 
 import { memo, useEffect, useMemo, useState } from "react";
 import { getStockHistory, searchStocks, type ApiOHLCPoint, type ApiStock } from "@/lib/api";
-import { EXCHANGE_OPTIONS } from "@/lib/exchanges";
+import { EXCHANGE_OPTIONS, getExchangeDisplayName } from "@/lib/exchanges";
 import type { PortfolioHolding } from "@/components/dashboard/portfolio-overview";
 import type { ApiWatchlistItem } from "@/lib/api";
+import { useUsdEquivalents } from "@/lib/use-usd-display";
 const rangeOptions = ["1D", "5D", "1M", "6M", "YTD", "1Y"] as const;
 type RangeOption = (typeof rangeOptions)[number];
 const CHART_WIDTH = 980;
@@ -17,6 +18,8 @@ type ChartsPageProps = {
     companyName: string;
     exchange?: string;
     currentPrice?: number;
+    currentPriceUsd?: number;
+    currency?: string;
   }) => void;
   holdings?: PortfolioHolding[];
   watchlist?: ApiWatchlistItem[];
@@ -129,6 +132,7 @@ export const ChartsPage = memo(function ChartsPage({
   holdings,
   watchlist,
 }: ChartsPageProps) {
+  const { showUsdEquivalents } = useUsdEquivalents();
   const [stocks, setStocks] = useState<ApiStock[]>([]);
   const [query, setQuery] = useState("");
   const [pendingSymbol, setPendingSymbol] = useState<string>("");
@@ -270,6 +274,7 @@ export const ChartsPage = memo(function ChartsPage({
     [selectedSymbol, stocks],
   );
   const stockCurrency = selected?.currency ?? "USD";
+  const fxRateToUsd = selected?.fxRateToUsd ?? null;
 
   useEffect(() => {
     let active = true;
@@ -391,7 +396,7 @@ export const ChartsPage = memo(function ChartsPage({
                 setSelectedSymbol("");
                 setPendingSymbol("");
               }}
-              placeholder="Search for a company"
+              placeholder="Search stock by symbol or company"
             />
             {query ? (
               <button
@@ -434,7 +439,7 @@ export const ChartsPage = memo(function ChartsPage({
                     <p className="ta-analysis-dropdown-name">{stock.companyName}</p>
                     <p className="ta-analysis-dropdown-symbol">{stock.symbol}</p>
                   </div>
-                  <span className="ta-analysis-dropdown-exchange">{stock.exchange}</span>
+                  <span className="ta-analysis-dropdown-exchange">{getExchangeDisplayName(stock.exchange)}</span>
                 </button>
               ))
             ) : searchError ? (
@@ -514,8 +519,8 @@ export const ChartsPage = memo(function ChartsPage({
 
       {isStockView && selected ? (
         <article className="ta-dashboard-section-card ta-charts-shell">
-          <button type="button" className="ta-analysis-back-btn" onClick={handleBackToSearch} aria-label="Back to search">
-            ←
+          <button type="button" className="ta-analysis-back-btn" onClick={handleBackToSearch}>
+            &#x2B05;
           </button>
           {!selected ? (
             <p className="ta-market-watch-note">
@@ -532,6 +537,8 @@ export const ChartsPage = memo(function ChartsPage({
                 companyName: selected.companyName,
                 exchange: selected.exchange,
                 currentPrice: selected.currentPrice,
+                currentPriceUsd: selected.currentPriceUsd,
+                currency: selected.currency,
               })
             }
           >
@@ -543,6 +550,9 @@ export const ChartsPage = memo(function ChartsPage({
             {formatCurrency(latest?.close, stockCurrency)}{" "}
             <span>{stockCurrency}</span>
           </p>
+          {showUsdEquivalents && fxRateToUsd && latest?.close !== undefined ? (
+            <p className="ta-usd-equiv">{formatCurrency(latest.close * fxRateToUsd, "USD")}</p>
+          ) : null}
           <p className={`ta-charts-change ${tone}`}>
             {diff >= 0 ? "+" : ""}
             {diff.toFixed(2)} ({diffPct.toFixed(2)}%) {diff >= 0 ? "▲" : "▼"} past{" "}

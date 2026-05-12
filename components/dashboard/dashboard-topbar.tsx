@@ -1,7 +1,10 @@
+"use client";
+
 import { memo } from "react";
 import type { DashboardTab } from "@/components/dashboard/tabs";
 import { DashboardTabsNav } from "@/components/dashboard/dashboard-tabs-nav";
 import { ProfileMenu } from "@/components/dashboard/profile-menu";
+import { useUsdEquivalents } from "@/lib/use-usd-display";
 
 type DashboardTopbarProps = {
   activeTab: DashboardTab;
@@ -17,6 +20,7 @@ type DashboardTopbarProps = {
   onLogout: () => Promise<void>;
   onAutoTickerToggle: () => Promise<void>;
   onRefreshPrices: () => Promise<void>;
+  onResetPortfolio: () => Promise<void>;
 };
 
 export const DashboardTopbar = memo(function DashboardTopbar({
@@ -33,7 +37,9 @@ export const DashboardTopbar = memo(function DashboardTopbar({
   onLogout,
   onAutoTickerToggle,
   onRefreshPrices,
+  onResetPortfolio,
 }: DashboardTopbarProps) {
+  const { showUsdEquivalents, toggle } = useUsdEquivalents();
   return (
     <header className="ta-topbar">
       <div className="ta-topbar-left">
@@ -54,6 +60,22 @@ export const DashboardTopbar = memo(function DashboardTopbar({
       </div>
 
       <div className="ta-topbar-right">
+        <div className="ta-currency-pill-wrap">
+          <button
+            type="button"
+            className={`ta-currency-pill-btn ${!showUsdEquivalents ? "active" : ""}`}
+            onClick={() => { if (showUsdEquivalents) toggle(); }}
+          >
+            Native
+          </button>
+          <button
+            type="button"
+            className={`ta-currency-pill-btn ${showUsdEquivalents ? "active" : ""}`}
+            onClick={() => { if (!showUsdEquivalents) toggle(); }}
+          >
+            USD
+          </button>
+        </div>
         <button
           type="button"
           className="ta-theme-toggle"
@@ -78,6 +100,7 @@ export const DashboardTopbar = memo(function DashboardTopbar({
           isRefreshingPrices={isRefreshingPrices}
           onAutoTickerToggle={onAutoTickerToggle}
           onRefreshPrices={onRefreshPrices}
+          onResetPortfolio={onResetPortfolio}
         />
       </div>
     </header>

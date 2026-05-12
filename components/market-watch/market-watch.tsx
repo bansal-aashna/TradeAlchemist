@@ -4,7 +4,7 @@ import { memo, useEffect, useMemo, useState } from "react";
 import type { TradeDraft } from "@/components/dashboard/trade-modal";
 import type { PortfolioHolding } from "@/components/dashboard/portfolio-overview";
 import { searchStocks, type ApiStock, type ApiWatchlistItem } from "@/lib/api";
-import { EXCHANGE_OPTIONS, type ExchangeId } from "@/lib/exchanges";
+import { EXCHANGE_OPTIONS, getExchangeDisplayName, type ExchangeId } from "@/lib/exchanges";
 import type { TradeDrawerStock } from "@/components/dashboard/trade-drawer";
 
 type MarketWatchProps = {
@@ -17,6 +17,8 @@ type MarketWatchProps = {
   priceRefreshVersion?: number;
   onRowClick?: (stock: TradeDrawerStock) => void;
   onOpenBuyStock?: (stock: TradeDrawerStock) => void;
+  customWatchlists: Record<string, string[]>;
+  onSetCustomWatchlists: (val: Record<string, string[]>) => void;
 };
 
 export const MarketWatch = memo(function MarketWatch({
@@ -29,11 +31,53 @@ export const MarketWatch = memo(function MarketWatch({
   priceRefreshVersion = 0,
   onRowClick,
   onOpenBuyStock,
+  customWatchlists = {},
+  onSetCustomWatchlists = () => {},
 }: MarketWatchProps) {
   const [selectedExchange, setSelectedExchange] = useState<ExchangeId>("NSE");
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ApiStock[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
+
+  const [activeWatchlist, setActiveWatchlist] = useState<string>("All Stocks");
+  const [newWatchlistName, setNewWatchlistName] = useState("");
+
+  const handleCreateWatchlist = () => {
+    const name = newWatchlistName.trim();
+    if (!name || name === "All Stocks" || customWatchlists[name]) return;
+    onSetCustomWatchlists({ ...customWatchlists, [name]: [] });
+    setNewWatchlistName("");
+    setActiveWatchlist(name);
+  };
+
+  const handleDeleteWatchlist = (name: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (name === "All Stocks") return;
+    const next = { ...customWatchlists };
+    delete next[name];
+    onSetCustomWatchlists(next);
+    if (activeWatchlist === name) {
+      setActiveWatchlist("All Stocks");
+    }
+  };
+
+  const handleAddStockToWatchlist = async (stock: { ticker: string; companyName: string; exchange: string }) => {
+    await onAddWatchlist(stock);
+    if (activeWatchlist !== "All Stocks") {
+      const currentList = customWatchlists[activeWatchlist] || [];
+      if (currentList.includes(stock.ticker)) return;
+      onSetCustomWatchlists({ ...customWatchlists, [activeWatchlist]: [...currentList, stock.ticker] });
+    }
+  };
+
+  const handleRemoveStock = async (stock: ApiWatchlistItem) => {
+    if (activeWatchlist === "All Stocks") {
+      await onRemoveWatchlist(stock);
+    } else {
+      const currentList = customWatchlists[activeWatchlist] || [];
+      onSetCustomWatchlists({ ...customWatchlists, [activeWatchlist]: currentList.filter(t => t !== stock.ticker) });
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -77,7 +121,55 @@ export const MarketWatch = memo(function MarketWatch({
     <section className="ta-dashboard-content">
       <div className="ta-market-watch-new">
 
-        <h2 className="ta-watch-main-title">Market Watch</h2>
+        <div className="ta-watch-manage-row">
+          <h2 className="ta-watch-main-title">Market Watch</h2>
+          <div className="ta-watch-create-inline">
+            <input
+              type="text"
+              className="ta-watch-create-input"
+              placeholder="New Watchlist Name..."
+              value={newWatchlistName}
+              onChange={(e) => setNewWatchlistName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreateWatchlist()}
+            />
+            <button
+              type="button"
+              className="ta-watch-create-btn"
+              onClick={handleCreateWatchlist}
+            >
+              Create
+            </button>
+          </div>
+        </div>
+
+        <div className="ta-watchlist-chips">
+          <button
+            type="button"
+            className={`ta-watchlist-chip ${activeWatchlist === "All Stocks" ? "active" : ""}`}
+            onClick={() => setActiveWatchlist("All Stocks")}
+          >
+            All Stocks
+          </button>
+          {Object.keys(customWatchlists || {}).map(name => (
+            <div key={name} className="ta-watchlist-chip-wrap">
+              <button
+                type="button"
+                className={`ta-watchlist-chip ${activeWatchlist === name ? "active" : ""}`}
+                onClick={() => setActiveWatchlist(name)}
+              >
+                {name}
+              </button>
+              <button
+                type="button"
+                className="ta-watchlist-delete"
+                onClick={(e) => handleDeleteWatchlist(name, e)}
+                title="Delete Watchlist"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
 
         <div className="ta-buy-search-card">
           <div className="ta-buy-search-row">
@@ -129,6 +221,20 @@ export const MarketWatch = memo(function MarketWatch({
                 <article key={`${stock.exchange}-${stock.symbol}`} className="ta-watch-result-item">
                   <button
                     type="button"
+                    className="ta-add-watchlist-icon"
+                    title={activeWatchlist === "All Stocks" ? "Add to Watchlist" : `Add to ${activeWatchlist}`}
+                    onClick={() =>
+                      void handleAddStockToWatchlist({
+                        ticker: stock.symbol,
+                        companyName: stock.companyName,
+                        exchange: stock.exchange,
+                      })
+                    }
+                  >
+                    +
+                  </button>
+                  <button
+                    type="button"
                     className="ta-stock-link ta-stock-result-link"
                     onClick={() =>
                       onOpenBuyStock?.({
@@ -142,22 +248,7 @@ export const MarketWatch = memo(function MarketWatch({
                     <p className="ta-watch-preview-symbol">{stock.symbol}</p>
                     <p className="ta-watch-preview-name">{stock.companyName}</p>
                   </button>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
-                    <span className="ta-watch-result-exchange">{stock.exchange}</span>
-                    <button
-                      type="button"
-                      className="ta-watch-add-btn"
-                      onClick={() =>
-                        onAddWatchlist({
-                          ticker: stock.symbol,
-                          companyName: stock.companyName,
-                          exchange: stock.exchange,
-                        })
-                      }
-                    >
-                      +
-                    </button>
-                  </div>
+                  <span className="ta-watch-result-exchange">{getExchangeDisplayName(stock.exchange)}</span>
                 </article>
               ))
             ) : searchError ? (
@@ -166,11 +257,12 @@ export const MarketWatch = memo(function MarketWatch({
               </p>
             ) : (
               <p className="ta-market-watch-note">
-                No matching stocks found. 
+                No matching stocks found.
               </p>
             )}
           </div>
         ) : null}
+
 
         <div className="ta-holdings-table-wrap">
           <table className="ta-holdings-table">
@@ -194,131 +286,136 @@ export const MarketWatch = memo(function MarketWatch({
             </thead>
             <tbody>
               {watchlist.length > 0 ? (
-                watchlist.map((stock) => {
+                watchlist
+                  .filter(stock => {
+                    if (activeWatchlist === "All Stocks") return true;
+                    return customWatchlists[activeWatchlist]?.includes(stock.ticker);
+                  })
+                  .map((stock) => {
                   const availableShares =
                     holdings?.find((holding) => holding.ticker === stock.ticker)?.quantity ?? 0;
                   const canSell = availableShares > 0;
 
                   return (
-                  <tr
-                    key={`${stock.exchange}-${stock.ticker}`}
-                    className="ta-clickable-row"
-                    onClick={(e) => {
-                      // Don't open drawer when clicking action buttons
-                      if ((e.target as HTMLElement).closest('button')) return;
-                      onRowClick?.({ ticker: stock.ticker, companyName: stock.companyName, exchange: stock.exchange, currentPrice: stock.currentPrice });
-                    }}
-                  >
-                    <td>
-                      <button
-                        type="button"
-                        className="ta-stock-link"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onOpenBuyStock?.({
-                            ticker: stock.ticker,
-                            companyName: stock.companyName,
-                            exchange: stock.exchange,
-                            currentPrice: stock.currentPrice,
-                          });
-                        }}
-                      >
-                        <p className="ta-holding-ticker">{stock.ticker}</p>
-                      </button>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="ta-stock-link ta-stock-link-muted"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onOpenBuyStock?.({
-                            ticker: stock.ticker,
-                            companyName: stock.companyName,
-                            exchange: stock.exchange,
-                            currentPrice: stock.currentPrice,
-                          });
-                        }}
-                      >
-                        <p className="ta-stock-company">{stock.companyName}</p>
-                      </button>
-                    </td>
-                    <td>{stock.exchange}</td>
-
-                    <td>{stock.prevClose?.toFixed(2) ?? "--"}</td>
-
-                    <td className={(stock.currentPrice ?? 0) >= (stock.open ?? 0) ? "positive" : "negative"}>
-                      {stock.currentPrice?.toFixed(2) ?? "--"}
-                    </td>
-
-                    <td className={(stock.change ?? 0) >= 0 ? "positive" : "negative"}>
-                      {(stock.change ?? 0) >= 0 ? "▲" : "▼"} {stock.change?.toFixed(2) ?? "--"}
-                    </td>
-
-                    <td className={(stock.percentChange ?? 0) >= 0 ? "positive" : "negative"}>
-                      {(stock.percentChange ?? 0) >= 0 ? "+" : ""}
-                      {stock.percentChange?.toFixed(2) ?? "--"}%
-                    </td>
-
-                    <td>{stock.open?.toFixed(2) ?? "--"}</td>
-                    <td>{stock.high?.toFixed(2) ?? "--"}</td>
-                    <td>{stock.low?.toFixed(2) ?? "--"}</td>
-                    <td>{stock.volume?.toLocaleString() ?? "--"}</td>
-
-                    <td>
-                      <div className="ta-trade-cell">
+                    <tr
+                      key={`${stock.exchange}-${stock.ticker}`}
+                      className="ta-clickable-row"
+                      onClick={(e) => {
+                        // Don't open drawer when clicking action buttons
+                        if ((e.target as HTMLElement).closest('button')) return;
+                        onRowClick?.({ ticker: stock.ticker, companyName: stock.companyName, exchange: stock.exchange, currentPrice: stock.currentPrice });
+                      }}
+                    >
+                      <td>
                         <button
                           type="button"
-                          className="ta-type-pill ta-type-pill-btn buy"
-                          onClick={() =>
-                            onTradeAction({
+                          className="ta-stock-link"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onOpenBuyStock?.({
                               ticker: stock.ticker,
-                              company: stock.companyName,
+                              companyName: stock.companyName,
                               exchange: stock.exchange,
-                              price: stock.currentPrice ?? 0,
-                              type: "buy",
-                            })
-                          }
-                          disabled={!stock.currentPrice}
+                              currentPrice: stock.currentPrice,
+                            });
+                          }}
                         >
-                          Buy
+                          <p className="ta-holding-ticker">{stock.ticker}</p>
                         </button>
+                      </td>
+                      <td>
                         <button
                           type="button"
-                          className="ta-type-pill ta-type-pill-btn sell"
-                          disabled={!canSell}
-                          onClick={() =>
-                            onTradeAction({
+                          className="ta-stock-link ta-stock-link-muted"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onOpenBuyStock?.({
                               ticker: stock.ticker,
-                              company: stock.companyName,
+                              companyName: stock.companyName,
                               exchange: stock.exchange,
-                              price: stock.currentPrice ?? 0,
-                              type: "sell",
-                              maxShares: availableShares,
-                            })
-                          }
+                              currentPrice: stock.currentPrice,
+                            });
+                          }}
                         >
-                          Sell
+                          <p className="ta-stock-company">{stock.companyName}</p>
                         </button>
-                      </div>
-                    </td>
+                      </td>
+                      <td>{getExchangeDisplayName(stock.exchange)}</td>
 
-                    {/* DELETE BUTTON */}
-                    <td>
-                      <button
-                        type="button"
-                        className="ta-delete-icon"
-                        onClick={() => onRemoveWatchlist(stock)}
-                      >
-                        <img
-                          src={isDarkMode ? "/bin-dark.png" : "/bin-light.png"}
-                          alt="Delete"
-                          width={18}
-                          height={18}
-                        />
-                      </button>
-                    </td>
-                  </tr>
+                      <td>{stock.prevClose?.toFixed(2) ?? "--"}</td>
+
+                      <td className={(stock.currentPrice ?? 0) >= (stock.open ?? 0) ? "positive" : "negative"}>
+                        {stock.currentPrice?.toFixed(2) ?? "--"}
+                      </td>
+
+                      <td className={(stock.change ?? 0) >= 0 ? "positive" : "negative"}>
+                        {(stock.change ?? 0) >= 0 ? "▲" : "▼"} {stock.change?.toFixed(2) ?? "--"}
+                      </td>
+
+                      <td className={(stock.percentChange ?? 0) >= 0 ? "positive" : "negative"}>
+                        {(stock.percentChange ?? 0) >= 0 ? "+" : ""}
+                        {stock.percentChange?.toFixed(2) ?? "--"}%
+                      </td>
+
+                      <td>{stock.open?.toFixed(2) ?? "--"}</td>
+                      <td>{stock.high?.toFixed(2) ?? "--"}</td>
+                      <td>{stock.low?.toFixed(2) ?? "--"}</td>
+                      <td>{stock.volume?.toLocaleString() ?? "--"}</td>
+
+                      <td>
+                        <div className="ta-trade-cell">
+                          <button
+                            type="button"
+                            className="ta-type-pill ta-type-pill-btn buy"
+                            onClick={() =>
+                              onTradeAction({
+                                ticker: stock.ticker,
+                                company: stock.companyName,
+                                exchange: stock.exchange,
+                                price: stock.currentPrice ?? 0,
+                                type: "buy",
+                              })
+                            }
+                            disabled={!stock.currentPrice}
+                          >
+                            Buy
+                          </button>
+                          <button
+                            type="button"
+                            className="ta-type-pill ta-type-pill-btn sell"
+                            disabled={!canSell}
+                            onClick={() =>
+                              onTradeAction({
+                                ticker: stock.ticker,
+                                company: stock.companyName,
+                                exchange: stock.exchange,
+                                price: stock.currentPrice ?? 0,
+                                type: "sell",
+                                maxShares: availableShares,
+                              })
+                            }
+                          >
+                            Sell
+                          </button>
+                        </div>
+                      </td>
+
+                      {/* DELETE BUTTON */}
+                      <td>
+                        <button
+                          type="button"
+                          className="ta-delete-icon"
+                          onClick={() => handleRemoveStock(stock)}
+                        >
+                          <img
+                            src={isDarkMode ? "/bin-dark.png" : "/bin-light.png"}
+                            alt="Delete"
+                            width={18}
+                            height={18}
+                          />
+                        </button>
+                      </td>
+                    </tr>
                   );
                 })
               ) : (

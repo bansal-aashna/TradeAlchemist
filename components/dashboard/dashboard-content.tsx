@@ -15,7 +15,7 @@ import {
 import { MarketWatch } from "@/components/market-watch/market-watch";
 import { ChartsPage } from "@/components/dashboard/charts-page";
 import type { DashboardTab } from "@/components/dashboard/tabs";
-import type { ApiWatchlistItem } from "@/lib/api";
+import type { ApiLimitOrder, ApiWatchlistItem, PlaceLimitOrderRequest } from "@/lib/api";
 import { TradeDrawer, type TradeDrawerStock } from "@/components/dashboard/trade-drawer";
 
 type BuyNavigationTarget = {
@@ -32,18 +32,17 @@ type DashboardContentProps = {
   isDarkMode: boolean;
   transactions: TransactionRecord[];
   watchlist: ApiWatchlistItem[];
-  onTradeAction: (trade: TradeDraft) => void;
-  onExecuteTrade: (
-    trade: TradeDraft,
-    shares: number,
-    options?: { orderType?: "market" | "limit"; limitPrice?: number },
-  ) => Promise<void>;
+  onExecuteTrade: (trade: TradeDraft, shares: number) => Promise<void>;
   onAddWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onRemoveWatchlist: (item: ApiWatchlistItem) => Promise<void>;
+  pendingLimitOrders: ApiLimitOrder[];
+  onPlaceLimitOrder: (request: PlaceLimitOrderRequest) => Promise<void>;
   onPreviewNavigate: (tab: DashboardTab) => void;
   priceRefreshVersion: number;
   onOpenBuyStock: (stock: BuyNavigationTarget) => void;
   buyNavigationStock?: BuyNavigationTarget | null;
+  customWatchlists: Record<string, string[]>;
+  onSetCustomWatchlists: (val: Record<string, string[]>) => void;
 };
 
 export const DashboardContent = memo(function DashboardContent({
@@ -53,14 +52,17 @@ export const DashboardContent = memo(function DashboardContent({
   isDarkMode,
   transactions,
   watchlist,
-  onTradeAction,
   onExecuteTrade,
   onAddWatchlist,
   onRemoveWatchlist,
+  pendingLimitOrders,
+  onPlaceLimitOrder,
   onPreviewNavigate,
   priceRefreshVersion,
   onOpenBuyStock,
   buyNavigationStock,
+  customWatchlists,
+  onSetCustomWatchlists,
 }: DashboardContentProps) {
   const [drawerStock, setDrawerStock] = useState<TradeDrawerStock | null>(null);
 
@@ -72,13 +74,29 @@ export const DashboardContent = memo(function DashboardContent({
     setDrawerStock(null);
   }
 
+  function handleTradeAction(trade: TradeDraft) {
+    openDrawer({
+      ticker: trade.ticker,
+      companyName: trade.company ?? trade.ticker,
+      exchange: trade.exchange ?? "",
+      currentPrice: trade.price,
+      initialTradeMode: trade.type,
+    });
+  }
+
   // Wrap onExecuteTrade to accept TradeDraft-like signature from the drawer
   async function handleDrawerTrade(
-    trade: { ticker: string; company: string; exchange: string; price: number; type: "buy" | "sell"; maxShares?: number },
+    trade: {
+      ticker: string;
+      company: string;
+      exchange: string;
+      price: number;
+      type: "buy" | "sell";
+      maxShares?: number;
+    },
     shares: number,
-    options?: { orderType?: "market" | "limit"; limitPrice?: number },
   ) {
-    await onExecuteTrade(trade as TradeDraft, shares, options);
+    await onExecuteTrade(trade as TradeDraft, shares);
   }
 
   return (
@@ -90,6 +108,7 @@ export const DashboardContent = memo(function DashboardContent({
         buyingPower={portfolioMetrics?.buyingPower}
         onClose={closeDrawer}
         onExecuteTrade={handleDrawerTrade}
+        onPlaceLimitOrder={onPlaceLimitOrder}
       />
 
       {activeTab === "Dashboard" && (
@@ -98,15 +117,18 @@ export const DashboardContent = memo(function DashboardContent({
           transactions={transactions}
           watchlist={watchlist}
           isDarkMode={isDarkMode}
-          onTradeAction={onTradeAction}
+          onTradeAction={handleTradeAction}
           onExecuteTrade={onExecuteTrade}
           onAddWatchlist={onAddWatchlist}
           onRemoveWatchlist={onRemoveWatchlist}
+          pendingLimitOrders={pendingLimitOrders}
+          onPlaceLimitOrder={onPlaceLimitOrder}
           onPreviewNavigate={onPreviewNavigate}
           onRowClick={openDrawer}
           priceRefreshVersion={priceRefreshVersion}
           buyingPower={portfolioMetrics?.buyingPower}
           onOpenBuyStock={onOpenBuyStock}
+          customWatchlists={customWatchlists}
         />
       )}
 
@@ -114,9 +136,10 @@ export const DashboardContent = memo(function DashboardContent({
         <PortfolioOverview
           metrics={portfolioMetrics}
           holdings={holdings}
-          onTradeAction={onTradeAction}
+          onTradeAction={handleTradeAction}
           onRowClick={openDrawer}
           onOpenBuyStock={onOpenBuyStock}
+          pendingLimitOrders={pendingLimitOrders}
         />
       )}
 
@@ -125,30 +148,33 @@ export const DashboardContent = memo(function DashboardContent({
           isDarkMode={isDarkMode}
           holdings={holdings}
           watchlist={watchlist}
-          onTradeAction={onTradeAction}
+          onTradeAction={handleTradeAction}
           onAddWatchlist={onAddWatchlist}
           onRemoveWatchlist={onRemoveWatchlist}
           priceRefreshVersion={priceRefreshVersion}
           onRowClick={openDrawer}
           onOpenBuyStock={onOpenBuyStock}
+          customWatchlists={customWatchlists}
+          onSetCustomWatchlists={onSetCustomWatchlists}
         />
       )}
 
       {activeTab === "Buy" && (
         <BuyPage
           holdings={holdings}
-          onTradeAction={onTradeAction}
+          onTradeAction={handleTradeAction}
           onExecuteTrade={onExecuteTrade}
           buyingPower={portfolioMetrics?.buyingPower}
           priceRefreshVersion={priceRefreshVersion}
           initialStock={buyNavigationStock}
+          onPlaceLimitOrder={onPlaceLimitOrder}
         />
       )}
 
       {activeTab === "Sell" && (
         <SellPage
           holdings={holdings}
-          onTradeAction={onTradeAction}
+          onTradeAction={handleTradeAction}
           onRowClick={openDrawer}
           onOpenBuyStock={onOpenBuyStock}
         />

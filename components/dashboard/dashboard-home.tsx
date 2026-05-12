@@ -2,11 +2,20 @@
 
 import { memo, useEffect, useMemo, useState } from "react";
 import type { PortfolioHolding } from "@/components/dashboard/portfolio-overview";
+import { AllocationDonut } from "@/components/dashboard/allocation-donut";
 import type { TradeDraft } from "@/components/dashboard/trade-modal";
 import type { TransactionRecord } from "@/components/dashboard/transaction-history-table";
-import { searchStocks, getStockHistory, type ApiOHLCPoint, type ApiStock, type ApiWatchlistItem } from "@/lib/api";
+import {
+  searchStocks,
+  getStockHistory,
+  type ApiLimitOrder,
+  type ApiOHLCPoint,
+  type ApiStock,
+  type ApiWatchlistItem,
+  type PlaceLimitOrderRequest,
+} from "@/lib/api";
 import type { TradeDrawerStock } from "@/components/dashboard/trade-drawer";
-import { AssetAllocationDonut } from "./donut-chart";
+import { useUsdEquivalents } from "@/lib/use-usd-display";
 
 const rangeOptions = ["1D", "5D", "1M", "6M", "YTD", "1Y"] as const;
 type RangeOption = (typeof rangeOptions)[number];
@@ -20,17 +29,16 @@ type DashboardHomeProps = {
   isDarkMode: boolean;
   buyingPower?: number;
   onTradeAction: (trade: TradeDraft) => void;
-  onExecuteTrade?: (
-    trade: TradeDraft,
-    shares: number,
-    options?: { orderType?: "market" | "limit"; limitPrice?: number },
-  ) => Promise<void>;
+  onExecuteTrade?: (trade: TradeDraft, shares: number) => Promise<void>;
   onAddWatchlist: (item: ApiWatchlistItem) => Promise<void>;
   onRemoveWatchlist: (item: ApiWatchlistItem) => Promise<void>;
+  pendingLimitOrders: ApiLimitOrder[];
+  onPlaceLimitOrder: (request: PlaceLimitOrderRequest) => Promise<void>;
   onPreviewNavigate: (tab: DashboardTab) => void;
   onRowClick?: (stock: TradeDrawerStock) => void;
   priceRefreshVersion?: number;
   onOpenBuyStock?: (stock: TradeDrawerStock) => void;
+  customWatchlists: Record<string, string[]>;
 };
 
 function formatDateTime(value: string) {
@@ -138,11 +146,15 @@ export const DashboardHome = memo(function DashboardHome({
   onExecuteTrade,
   onAddWatchlist,
   onRemoveWatchlist,
+  pendingLimitOrders,
+  onPlaceLimitOrder,
   onPreviewNavigate,
   onRowClick,
   priceRefreshVersion = 0,
   onOpenBuyStock,
+  customWatchlists = {},
 }: DashboardHomeProps) {
+  const { showUsdEquivalents } = useUsdEquivalents();
   const [stocks, setStocks] = useState<ApiStock[]>([]);
   const [selectedExchange, setSelectedExchange] = useState<ExchangeId>(EXCHANGE_OPTIONS[0].id);
   const [query, setQuery] = useState("");
@@ -151,8 +163,16 @@ export const DashboardHome = memo(function DashboardHome({
   const [tradeMode, setTradeMode] = useState<"buy" | "sell">("buy");
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
   const [shares, setShares] = useState<string>("0");
-  const [limitPrice, setLimitPrice] = useState<string>("0");
+  const [limitPrice, setLimitPrice] = useState<string>("");
   const [isTrading, setIsTrading] = useState(false);
+
+  // Rotating Watchlist State
+  const [watchlistIndex, setWatchlistIndex] = useState(0);
+  const watchlistKeys = useMemo(() => ["All Stocks", ...Object.keys(customWatchlists || {})], [customWatchlists]);
+  const activeWatchlistName = watchlistKeys[watchlistIndex] || "All Stocks";
+
+  const nextWatchlist = () => setWatchlistIndex((prev) => (prev + 1) % watchlistKeys.length);
+  const prevWatchlist = () => setWatchlistIndex((prev) => (prev - 1 + watchlistKeys.length) % watchlistKeys.length);
 
   const [activeRange, setActiveRange] = useState<RangeOption>("1Y");
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -214,8 +234,26 @@ export const DashboardHome = memo(function DashboardHome({
     () => filteredStocks.find((stock) => stock.symbol === selectedSymbol),
     [filteredStocks, selectedSymbol],
   );
-  const tradePrice = orderType === "limit" ? Number(limitPrice) || 0 : selectedStock?.currentPrice ?? 0;
+  const isSelectedStockWatchlisted = Boolean(
+    selectedStock &&
+      watchlist.some(
+        (item) =>
+          item.ticker === selectedStock.symbol &&
+          (!selectedStock.exchange || item.exchange === selectedStock.exchange),
+      ),
+  );
   const stockCurrency = selectedStock?.currency ?? "USD";
+  const selectedPriceUsd =
+    selectedStock?.currentPriceUsd ?? (stockCurrency === "USD" ? selectedStock?.currentPrice : undefined);
+  const limitPriceNumber = Number(limitPrice);
+  const limitPriceUsd =
+    Number.isFinite(limitPriceNumber) && limitPriceNumber > 0
+      ? stockCurrency === "USD"
+        ? limitPriceNumber
+        : selectedStock?.fxRateToUsd
+          ? limitPriceNumber * selectedStock.fxRateToUsd
+          : undefined
+      : undefined;
   const recentTransactions = transactions.slice(0, 5);
   const previewHoldings = holdings?.slice(0, 5) ?? [];
 
@@ -247,12 +285,6 @@ export const DashboardHome = memo(function DashboardHome({
       active = false;
     };
   }, [selectedStock?.symbol, activeRange, priceRefreshVersion]);
-
-  useEffect(() => {
-    if (selectedStock?.currentPrice !== undefined) {
-      setLimitPrice(String(selectedStock.currentPrice));
-    }
-  }, [selectedStock?.currentPrice]);
 
   const chartRangeSeries = useMemo(
     () => getSeriesByRange(historySeries, activeRange),
@@ -311,6 +343,93 @@ export const DashboardHome = memo(function DashboardHome({
     );
     return idx.map((i) => formatAxisDate(chartRangeSeries[i]?.date, activeRange));
   }, [chartRangeSeries, activeRange]);
+    const holdingsSection = (
+    <article className="ta-dashboard-section-card">
+            <div className="ta-dashboard-holdings-allocation">
+            <div className="ta-holdings-wrap">
+              <button
+                type="button"
+                className="ta-preview-link"
+                onClick={() => onPreviewNavigate("Portfolio")}
+              >
+                <h3 className="ta-holdings-title">All Holdings</h3>
+              </button>
+              <div className="ta-holdings-table-wrap">
+              <table className="ta-holdings-table">
+                <thead>
+                  <tr>
+                    <th>Stock</th>
+                    <th>Market Value</th>
+                    <th>Day's Gain</th>
+                    <th>Total Gain</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewHoldings.length > 0 ? (
+                    previewHoldings.map((holding) => {
+                      const marketValue = (holding.currentPrice ?? 0) * (holding.quantity ?? 0);
+                      const holdValue = (holding.holdPrice ?? 0) * (holding.quantity ?? 0);
+                      const dayGain = (holding.currentPrice ?? 0) - (holding.holdPrice ?? 0);
+                      const totalPL = holding.totalPL ?? (marketValue - holdValue);
+                      return (
+                        <tr
+                          key={holding.ticker}
+                          className="ta-clickable-row"
+                          onClick={() =>
+                            onRowClick?.({
+                              ticker: holding.ticker,
+                              companyName: holding.companyName ?? holding.ticker,
+                              exchange: holding.exchange ?? "",
+                              currentPrice: holding.currentPriceNative ?? holding.currentPrice,
+                              currentPriceUsd: holding.currentPrice,
+                              currency: holding.currency,
+                            })
+                          }
+                        >
+                          <td>
+                            <button
+                              type="button"
+                              className="ta-stock-link"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                              onOpenBuyStock?.({
+                                  ticker: holding.ticker,
+                                  companyName: holding.companyName ?? holding.ticker,
+                                  exchange: holding.exchange ?? "",
+                                  currentPrice: holding.currentPriceNative ?? holding.currentPrice,
+                                  currentPriceUsd: holding.currentPrice,
+                                  currency: holding.currency,
+                                });
+                              }}
+                            >
+                              <p className="ta-holding-ticker">{holding.ticker}</p>
+                            </button>
+                            <p className="ta-holding-qty">{holding.quantity ?? "--"} shares</p>
+                          </td>
+                          <td>{formatCurrency(marketValue)}</td>
+                          <td className={getTone(dayGain)}>{dayGain >= 0 ? "+" : ""}{formatCurrency(dayGain)}</td>
+                          <td className={getTone(totalPL)}>{formatCurrency(totalPL)}</td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="ta-holdings-empty">
+                        No holdings available.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            </div>
+            <div className="ta-allocation-wrap" style={{ marginTop: "0.8rem" }}>
+              <h3 className="ta-holdings-title">Asset Allocation</h3>
+              <AllocationDonut holdings={holdings} />
+            </div>
+            </div>
+          </article>
+  );
 
   return (
     <section className="ta-dashboard-content ta-dashboard-home">
@@ -397,15 +516,17 @@ export const DashboardHome = memo(function DashboardHome({
         {selectedStock ? (
           <div className="ta-dh-selected-grid">
             {/* Chart Column */}
-            <article className="ta-dashboard-section-card" style={{ padding: '1.25rem' }}>
+            <div className="ta-dh-chart-col" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <article className="ta-dashboard-section-card" style={{ padding: '1.25rem' }}>
               <div className="ta-buy-selected-card ta-dashboard-selected-row" style={{ marginTop: 0, paddingBottom: '1rem', borderBottom: '1px solid var(--border-light)' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <p className="ta-buy-selected-symbol">{selectedStock.symbol}</p>
                     <button
                       type="button"
-                      className="ta-add-watchlist-icon"
-                      title="Add to Watchlist"
+                      className={`ta-add-watchlist-icon ${isSelectedStockWatchlisted ? "added" : ""}`}
+                      title={isSelectedStockWatchlisted ? "Added to Watchlist" : "Add to Watchlist"}
+                      aria-label={isSelectedStockWatchlisted ? "Added to Watchlist" : "Add to Watchlist"}
                       onClick={() => onAddWatchlist({ ticker: selectedStock.symbol, companyName: selectedStock.companyName, exchange: selectedStock.exchange })}
                     >
                       +
@@ -415,6 +536,9 @@ export const DashboardHome = memo(function DashboardHome({
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <p className="ta-buy-selected-price">{formatCurrencyByCode(selectedStock.currentPrice, stockCurrency)}</p>
+                  {showUsdEquivalents && selectedPriceUsd ? (
+                    <p className="ta-usd-equiv">{formatCurrencyByCode(selectedPriceUsd, "USD")}</p>
+                  ) : null}
                   <p className={`ta-charts-change ${tone}`} style={{ fontSize: '0.9rem', margin: 0 }}>
                     {diff >= 0 ? "+" : ""}
                     {diff.toFixed(2)} ({diffPct.toFixed(2)}%)
@@ -501,6 +625,7 @@ export const DashboardHome = memo(function DashboardHome({
                 </div>
               </div>
             </article>
+            </div>
 
             {/* Trade Column */}
             <article className="ta-dashboard-section-card ta-trade-card">
@@ -525,18 +650,23 @@ export const DashboardHome = memo(function DashboardHome({
                 </button>
               </div>
 
-              <div className="ta-trade-order-mode">
+              <div className="ta-trade-seg-wrap ta-order-type-toggle">
                 <button
                   type="button"
-                  className={`ta-trade-mode-btn ${orderType === "market" ? "active" : ""}`}
-                  onClick={() => setOrderType("market")}
+                  className={`ta-trade-seg-btn ${orderType === 'market' ? 'active' : ''}`}
+                  onClick={() => setOrderType('market')}
                 >
                   Market
                 </button>
                 <button
                   type="button"
-                  className={`ta-trade-mode-btn ${orderType === "limit" ? "active" : ""}`}
-                  onClick={() => setOrderType("limit")}
+                  className={`ta-trade-seg-btn ${orderType === 'limit' ? 'active' : ''}`}
+                  onClick={() => {
+                    setOrderType('limit');
+                    if (!limitPrice && selectedStock.currentPrice) {
+                      setLimitPrice(String(selectedStock.currentPrice));
+                    }
+                  }}
                 >
                   Limit
                 </button>
@@ -560,8 +690,8 @@ export const DashboardHome = memo(function DashboardHome({
                       if (tradeMode === 'sell') {
                         const maxSell = holdings?.find(h => h.ticker === selectedStock.symbol)?.quantity ?? 0;
                         setShares(String(maxSell));
-                      } else if (selectedStock.currentPrice && selectedStock.currentPrice > 0) {
-                        const maxBuy = Math.floor((buyingPower ?? 0) / selectedStock.currentPrice);
+                      } else if (selectedPriceUsd && selectedPriceUsd > 0) {
+                        const maxBuy = Math.floor((buyingPower ?? 0) / selectedPriceUsd);
                         setShares(String(maxBuy));
                       }
                     }}
@@ -571,7 +701,7 @@ export const DashboardHome = memo(function DashboardHome({
                 </div>
               </div>
 
-              {orderType === "limit" ? (
+              {orderType === 'limit' ? (
                 <div className="ta-trade-field">
                   <label className="ta-trade-field-label">Limit Price</label>
                   <div className="ta-trade-shares-row">
@@ -590,8 +720,8 @@ export const DashboardHome = memo(function DashboardHome({
               {/* Estimated cost & buying power */}
               <div className="ta-trade-info">
                 <div className="ta-trade-info-row">
-                  <span>{orderType === "limit" ? "Estimated Order Value:" : "Estimated Cost:"}</span>
-                  <span>{formatCurrencyByCode((Number(shares) || 0) * tradePrice, stockCurrency)}</span>
+                  <span>{orderType === 'limit' ? 'Estimated at Limit:' : 'Estimated Cost:'}</span>
+                  <span>{formatCurrencyByCode((Number(shares) || 0) * (orderType === 'limit' ? limitPriceUsd ?? 0 : selectedPriceUsd ?? 0), "USD")}</span>
                 </div>
                 <div className="ta-trade-info-row">
                   <span>Buying Power:</span>
@@ -605,37 +735,39 @@ export const DashboardHome = memo(function DashboardHome({
                 className={`ta-trade-cta-btn ${tradeMode}`}
                 disabled={
                   isTrading ||
-                  !(orderType === "limit" ? tradePrice > 0 : selectedStock.currentPrice) ||
+                  !selectedStock.currentPrice ||
                   Number(shares) <= 0 ||
+                  (orderType === 'limit' && (!Number.isFinite(limitPriceNumber) || limitPriceNumber <= 0)) ||
+                  (tradeMode === 'buy' && (!selectedPriceUsd || selectedPriceUsd <= 0)) ||
                   (tradeMode === 'sell' && Number(shares) > (holdings?.find(h => h.ticker === selectedStock.symbol)?.quantity ?? 0))
                 }
                 onClick={async () => {
-                  if (isTrading || !selectedStock.currentPrice || !onExecuteTrade) return;
+                  if (isTrading || !selectedStock.currentPrice) return;
                   const qty = Number(shares);
                   if (isNaN(qty) || qty <= 0) return;
                   
                   setIsTrading(true);
                   try {
+                    if (orderType === 'limit') {
+                      if (!Number.isFinite(limitPriceNumber) || limitPriceNumber <= 0) return;
+                      await onPlaceLimitOrder({
+                        symbol: selectedStock.symbol,
+                        exchange: selectedStock.exchange,
+                        companyName: selectedStock.companyName,
+                        side: tradeMode,
+                        quantity: qty,
+                        limitPrice: limitPriceNumber,
+                      });
+                      setShares("0");
+                      return;
+                    }
+                    if (!onExecuteTrade) return;
                     if (tradeMode === 'sell') {
                       const maxShares = holdings?.find(h => h.ticker === selectedStock.symbol)?.quantity ?? 0;
                       if (maxShares <= 0 || qty > maxShares) return;
-                      await onExecuteTrade(
-                        { ticker: selectedStock.symbol, company: selectedStock.companyName, exchange: selectedStock.exchange, price: selectedStock.currentPrice, type: 'sell', maxShares },
-                        qty,
-                        {
-                          orderType,
-                          limitPrice: orderType === "limit" ? tradePrice : undefined,
-                        },
-                      );
+                      await onExecuteTrade({ ticker: selectedStock.symbol, company: selectedStock.companyName, exchange: selectedStock.exchange, price: selectedStock.currentPrice, type: 'sell', maxShares }, qty);
                     } else {
-                      await onExecuteTrade(
-                        { ticker: selectedStock.symbol, company: selectedStock.companyName, exchange: selectedStock.exchange, price: selectedStock.currentPrice, type: 'buy' },
-                        qty,
-                        {
-                          orderType,
-                          limitPrice: orderType === "limit" ? tradePrice : undefined,
-                        },
-                      );
+                      await onExecuteTrade({ ticker: selectedStock.symbol, company: selectedStock.companyName, exchange: selectedStock.exchange, price: selectedStock.currentPrice, type: 'buy' }, qty);
                     }
                     
                     // Reset shares after successful trade
@@ -645,11 +777,7 @@ export const DashboardHome = memo(function DashboardHome({
                   }
                 }}
               >
-                {isTrading
-                  ? 'Processing...'
-                  : orderType === "limit"
-                    ? `Place ${tradeMode === 'buy' ? 'Buy' : 'Sell'} Limit`
-                    : (tradeMode === 'buy' ? 'Place Buy Order' : 'Place Sell Order')}
+                {isTrading ? 'Processing...' : `${orderType === 'limit' ? 'Place Limit' : 'Place'} ${tradeMode === 'buy' ? 'Buy' : 'Sell'} Order`}
               </button>
 
               {/* Add to watchlist moved */}
@@ -657,7 +785,8 @@ export const DashboardHome = memo(function DashboardHome({
           </div>
         ) : (
           <div className="ta-dh-selected-grid">
-            <article className="ta-dashboard-section-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
+            <div className="ta-dh-chart-col" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <article className="ta-dashboard-section-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column' }}>
               <div className="ta-buy-selected-card ta-dashboard-selected-row" style={{ marginTop: 0, paddingBottom: '1rem', borderBottom: '1px solid var(--border-light)', opacity: 0.4 }}>
                 <div>
                   <p className="ta-buy-selected-symbol">--</p>
@@ -671,6 +800,7 @@ export const DashboardHome = memo(function DashboardHome({
                 <div className="ta-buy-chart-line" />
               </div>
             </article>
+            </div>
             <article className="ta-dashboard-section-card ta-trade-card" style={{ opacity: 0.4, pointerEvents: 'none' }}>
               <h3 className="ta-holdings-title">Trade</h3>
               <p className="ta-holdings-subtitle">Select a stock to trade.</p>
@@ -694,29 +824,26 @@ export const DashboardHome = memo(function DashboardHome({
           </div>
         )}
 
-        <article className="ta-dashboard-section-card">
-          <button
-            type="button"
-            className="ta-preview-link"
-            onClick={() => onPreviewNavigate("Portfolio")}
-          >
-            <h3 className="ta-holdings-title">Asset Allocation</h3>
-          </button>
-          <AssetAllocationDonut holdings={holdings ?? []} groupBy="classification" />
-        </article>
-
+        {holdingsSection}
         </div> {/* Close ta-dh-left */}
 
         <div className="ta-dh-right">
           {/* Watchlist */}
           <article className="ta-dashboard-section-card">
-            <button
-              type="button"
-              className="ta-preview-link"
-              onClick={() => onPreviewNavigate("Market Watch")}
-            >
-              <h3 className="ta-holdings-title">Watchlist</h3>
-            </button>
+            <div className="ta-watchlist-header-row">
+              <button
+                type="button"
+                className="ta-preview-link"
+                onClick={() => onPreviewNavigate("Market Watch")}
+              >
+                <h3 className="ta-holdings-title">Watchlist</h3>
+              </button>
+              <div className="ta-watchlist-rotation-nav">
+                <button type="button" className="ta-rotate-arrow" onClick={prevWatchlist}>‹</button>
+                <span className="ta-active-watchlist-name">{activeWatchlistName}</span>
+                <button type="button" className="ta-rotate-arrow" onClick={nextWatchlist}>›</button>
+              </div>
+            </div>
             
             <div className="ta-holdings-table-wrap">
               <table className="ta-holdings-table">
@@ -730,11 +857,27 @@ export const DashboardHome = memo(function DashboardHome({
                 </thead>
                 <tbody>
                   {watchlist.length > 0 ? (
-                    watchlist.slice(0, 5).map((stock) => (
+                    watchlist
+                      .filter(stock => {
+                        if (activeWatchlistName === "All Stocks") return true;
+                        const list = customWatchlists[activeWatchlistName] || [];
+                        return list.includes(stock.ticker);
+                      })
+                      .slice(0, 5)
+                      .map((stock) => (
                       <tr
                         key={`${stock.exchange}-${stock.ticker}`}
                         className="ta-clickable-row"
-                        onClick={() => onRowClick?.({ ticker: stock.ticker, companyName: stock.companyName, exchange: stock.exchange, currentPrice: stock.currentPrice })}
+                        onClick={() =>
+                          onRowClick?.({
+                            ticker: stock.ticker,
+                            companyName: stock.companyName,
+                            exchange: stock.exchange,
+                            currentPrice: stock.currentPrice,
+                            currentPriceUsd: stock.currentPriceUsd,
+                            currency: stock.currency,
+                          })
+                        }
                       >
                         <td>
                           <button
@@ -747,6 +890,8 @@ export const DashboardHome = memo(function DashboardHome({
                                 companyName: stock.companyName,
                                 exchange: stock.exchange,
                                 currentPrice: stock.currentPrice,
+                                currentPriceUsd: stock.currentPriceUsd,
+                                currency: stock.currency,
                               });
                             }}
                           >
@@ -764,6 +909,8 @@ export const DashboardHome = memo(function DashboardHome({
                                 companyName: stock.companyName,
                                 exchange: stock.exchange,
                                 currentPrice: stock.currentPrice,
+                                currentPriceUsd: stock.currentPriceUsd,
+                                currency: stock.currency,
                               });
                             }}
                           >
@@ -771,7 +918,12 @@ export const DashboardHome = memo(function DashboardHome({
                           </button>
                         </td>
                         <td>{stock.exchange}</td>
-                        <td>{formatCurrencyByCode(stock.currentPrice)}</td>
+                        <td>
+                          <div>{formatCurrencyByCode(stock.currentPrice, stock.currency ?? "USD")}</div>
+                          {showUsdEquivalents && stock.currentPriceUsd ? (
+                            <div className="ta-usd-equiv">{formatCurrencyByCode(stock.currentPriceUsd, "USD")}</div>
+                          ) : null}
+                        </td>
                       </tr>
                     ))
                   ) : (
@@ -786,67 +938,45 @@ export const DashboardHome = memo(function DashboardHome({
             </div>
           </article>
 
-          {/* Portfolio Holdings */}
+          {/* Pending Orders */}
           <article className="ta-dashboard-section-card">
-            <button
-              type="button"
-              className="ta-preview-link"
-              onClick={() => onPreviewNavigate("Portfolio")}
-            >
-              <h3 className="ta-holdings-title">All Holdings</h3>
-            </button>
-            
+            <h3 className="ta-holdings-title">Pending Orders</h3>
             <div className="ta-holdings-table-wrap">
               <table className="ta-holdings-table">
                 <thead>
                   <tr>
                     <th>Stock</th>
-                    <th>Market Value</th>
-                    <th>Day's Gain</th>
-                    <th>Total Gain</th>
+                    <th>Type</th>
+                    <th>Qty</th>
+                    <th>Limit</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {previewHoldings.length > 0 ? (
-                    previewHoldings.map((holding) => {
-                      const marketValue = (holding.currentPrice ?? 0) * (holding.quantity ?? 0);
-                      const holdValue = (holding.holdPrice ?? 0) * (holding.quantity ?? 0);
-                      const dayGain = (holding.currentPrice ?? 0) - (holding.holdPrice ?? 0);
-                      const totalPL = holding.totalPL ?? (marketValue - holdValue);
-                      return (
-                        <tr
-                          key={holding.ticker}
-                          className="ta-clickable-row"
-                          onClick={() => onRowClick?.({ ticker: holding.ticker, companyName: holding.companyName ?? holding.ticker, exchange: holding.exchange ?? "", currentPrice: holding.currentPrice })}
-                        >
-                          <td>
-                            <button
-                              type="button"
-                              className="ta-stock-link"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                onOpenBuyStock?.({
-                                  ticker: holding.ticker,
-                                  companyName: holding.companyName ?? holding.ticker,
-                                  exchange: holding.exchange ?? "",
-                                  currentPrice: holding.currentPrice,
-                                });
-                              }}
-                            >
-                              <p className="ta-holding-ticker">{holding.ticker}</p>
-                            </button>
-                            <p className="ta-holding-qty">{holding.quantity ?? "--"} shares</p>
-                          </td>
-                          <td>{formatCurrency(marketValue)}</td>
-                          <td className={getTone(dayGain)}>{dayGain >= 0 ? "+" : ""}{formatCurrency(dayGain)}</td>
-                          <td className={getTone(totalPL)}>{formatCurrency(totalPL)}</td>
-                        </tr>
-                      );
-                    })
+                  {pendingLimitOrders.length > 0 ? (
+                    pendingLimitOrders.slice(0, 5).map((order) => (
+                      <tr key={order.id}>
+                        <td>
+                          <p className="ta-holding-ticker">{order.ticker}</p>
+                          <p className="ta-stock-company">{order.companyName}</p>
+                        </td>
+                        <td>
+                          <span className={`ta-limit-order-type ${order.side}`}>
+                            {order.side.toUpperCase()}
+                          </span>
+                        </td>
+                        <td>{order.quantity}</td>
+                        <td>
+                          <div>{formatCurrencyByCode(order.limitPrice, order.currency ?? "USD")}</div>
+                          {order.createdAt ? (
+                            <div className="ta-usd-equiv">{formatDateTime(order.createdAt)}</div>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))
                   ) : (
                     <tr>
                       <td colSpan={4} className="ta-holdings-empty">
-                        No holdings available.
+                        No pending limit orders.
                       </td>
                     </tr>
                   )}

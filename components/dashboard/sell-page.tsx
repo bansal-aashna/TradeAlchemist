@@ -1,7 +1,10 @@
+"use client";
+
 import { memo } from "react";
 import type { PortfolioHolding } from "@/components/dashboard/portfolio-overview";
 import type { TradeDraft } from "@/components/dashboard/trade-modal";
 import type { TradeDrawerStock } from "@/components/dashboard/trade-drawer";
+import { useUsdEquivalents } from "@/lib/use-usd-display";
 
 type SellPageProps = {
   holdings?: PortfolioHolding[];
@@ -34,6 +37,7 @@ export const SellPage = memo(function SellPage({
   onRowClick,
   onOpenBuyStock,
 }: SellPageProps) {
+  const { showUsdEquivalents } = useUsdEquivalents();
   return (
     <section className="ta-dashboard-content ta-sell-page">
       <h2 className="ta-holdings-title">Sell</h2>
@@ -66,7 +70,9 @@ export const SellPage = memo(function SellPage({
                         ticker: holding.ticker,
                         companyName: holding.companyName ?? holding.ticker,
                         exchange: holding.exchange ?? "",
-                        currentPrice: holding.currentPrice,
+                        currentPrice: holding.currentPriceNative ?? holding.currentPrice,
+                        currentPriceUsd: holding.currentPrice,
+                        currency: holding.currency,
                         initialTradeMode: "sell",
                       });
                     }}
@@ -81,7 +87,9 @@ export const SellPage = memo(function SellPage({
                             ticker: holding.ticker,
                             companyName: holding.companyName ?? holding.ticker,
                             exchange: holding.exchange ?? "",
-                            currentPrice: holding.currentPrice,
+                            currentPrice: holding.currentPriceNative ?? holding.currentPrice,
+                            currentPriceUsd: holding.currentPrice,
+                            currency: holding.currency,
                           });
                         }}
                       >
@@ -90,8 +98,22 @@ export const SellPage = memo(function SellPage({
                       <p className="ta-holding-qty">Qty: {holding.quantity ?? "--"}</p>
                     </td>
                     <td>{holding.quantity ?? "--"}</td>
-                    <td>{formatCurrency(holding.currentPrice)}</td>
-                    <td>{formatCurrency(holding.holdPrice)}</td>
+                    <td>
+                      <div>{formatCurrency(holding.currentPrice)}</div>
+                      {showUsdEquivalents && holding.currentPriceNative !== null && holding.currentPriceNative !== undefined ? (
+                        <div className="ta-usd-equiv">
+                          {new Intl.NumberFormat("en-US", { style: "currency", currency: holding.currency ?? "USD", maximumFractionDigits: 2 }).format(holding.currentPriceNative)}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td>
+                      <div>{formatCurrency(holding.holdPrice)}</div>
+                      {showUsdEquivalents && holding.holdPriceNative !== null && holding.holdPriceNative !== undefined ? (
+                        <div className="ta-usd-equiv">
+                          {new Intl.NumberFormat("en-US", { style: "currency", currency: holding.currency ?? "USD", maximumFractionDigits: 2 }).format(holding.holdPriceNative)}
+                        </div>
+                      ) : null}
+                    </td>
                     <td className={`ta-portfolio-value ${tone}`}>
                       {holding.totalPL === undefined ? "--" : formatCurrency(holding.totalPL)}
                     </td>

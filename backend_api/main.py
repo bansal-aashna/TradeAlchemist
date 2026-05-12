@@ -15,16 +15,17 @@ from db.mongo_client import (
     live_prices,
     market_state,
     metadata,
-    orders,
     portfolios,
     holdings,
+    limit_orders,
     transactions,
     users,
     watchlists,
 )
-from trade_executor import execute_trade, place_limit_order, process_limit_orders
+from trade_executor import execute_trade, process_pending_limit_orders
 from auth_utils import get_current_user
 from simulator_tick import run_price_tick
+from fx_rates import currency_to_usd_rate, get_usd_base_rates
 
 
 PRICE_TICK_INTERVAL_SECONDS = int(os.getenv("PRICE_TICK_INTERVAL_SECONDS", "30"))
@@ -35,10 +36,12 @@ PRICE_TICKER_TASK = None
 async def price_ticker_loop():
     while True:
         try:
-            summary = await asyncio.to_thread(run_simulation_cycle)
+            summary = await asyncio.to_thread(run_price_tick)
+            order_summary = await asyncio.to_thread(process_pending_limit_orders)
             print(
                 "Price tick complete | "
-                f"Updated {summary['updated']} stocks | State {summary['state']}"
+                f"Updated {summary['updated']} stocks | State {summary['state']} | "
+                f"Limit orders executed {order_summary['executed']}"
             )
         except Exception as exc:
             print(f"Price tick failed: {exc}")
@@ -64,12 +67,6 @@ def stop_price_ticker():
         return False
     PRICE_TICKER_TASK.cancel()
     return True
-
-
-def run_simulation_cycle():
-    tick_summary = run_price_tick()
-    order_summary = process_limit_orders()
-    return {**tick_summary, "limitOrders": order_summary}
 
 
 @asynccontextmanager
@@ -192,6 +189,11 @@ def build_holdings_snapshot(uid: str, display_name: str):
         transactions.find(get_user_transaction_query(uid)).sort("timestamp", 1)
     )
 
+    try:
+        rates_doc = get_usd_base_rates(allow_stale_fallback=True)
+    except Exception:
+        rates_doc = None
+
     aggregated = {}
     for document in transaction_docs:
         symbol = document.get("symbol") or document.get("ticker")
@@ -202,7 +204,25 @@ def build_holdings_snapshot(uid: str, display_name: str):
         key = f"{symbol}::{exchange}"
         side = (document.get("side") or document.get("type") or "").upper()
         quantity = parse_int(document.get("quantity") or document.get("shares"))
-        price = parse_float(document.get("price"))
+        meta = metadata.find_one({"ticker": symbol}, {"_id": 0}) or {}
+        currency = document.get("currency") or meta.get("currency") or "USD"
+
+        fx_rate = parse_float(document.get("fxRateToUsd") or document.get("fx_rate_to_usd"))
+        if fx_rate <= 0 and rates_doc is not None:
+            try:
+                fx_rate = currency_to_usd_rate(currency, rates_doc)
+            except Exception:
+                fx_rate = 0.0
+
+        price_native = parse_float(
+            document.get("priceNative") or document.get("price_native") or document.get("price")
+        )
+        price_usd = parse_float(document.get("priceUsd") or document.get("price_usd"))
+        if price_usd <= 0 and fx_rate > 0:
+            price_usd = round(price_native * fx_rate, 6)
+        if price_usd <= 0:
+            # Last resort: assume legacy data already stored in USD.
+            price_usd = price_native
 
         if quantity <= 0:
             continue
@@ -214,14 +234,18 @@ def build_holdings_snapshot(uid: str, display_name: str):
                 "exchange": exchange,
                 "quantity": 0,
                 "cost_basis": 0.0,
+                "currency": currency,
+                "last_fx_rate_to_usd": fx_rate if fx_rate > 0 else None,
                 "lastTradeAt": get_transaction_datetime(document),
             },
         )
         snapshot["lastTradeAt"] = get_transaction_datetime(document)
+        if fx_rate > 0:
+            snapshot["last_fx_rate_to_usd"] = fx_rate
 
         if side == "BUY":
             snapshot["quantity"] += quantity
-            snapshot["cost_basis"] += price * quantity
+            snapshot["cost_basis"] += price_usd * quantity
         elif side == "SELL":
             current_quantity = snapshot["quantity"]
             average_price = (
@@ -243,16 +267,29 @@ def build_holdings_snapshot(uid: str, display_name: str):
     for row in open_positions:
         ticker = row["ticker"]
         current_quantity = row["quantity"]
-        hold_price = round(row["cost_basis"] / current_quantity, 2) if current_quantity > 0 else 0.0
+        hold_price_usd = round(row["cost_basis"] / current_quantity, 6) if current_quantity > 0 else 0.0
         meta = metadata_by_ticker.get(ticker, {})
         live = live_by_symbol.get(ticker, {})
-        current_price = parse_float(
+        currency = meta.get("currency") or row.get("currency") or "USD"
+        current_price_native = parse_float(
             live.get("price")
             or live.get("currentPrice")
             or meta.get("lastClose")
             or meta.get("last_close")
         )
-        total_pl = round((current_price - hold_price) * current_quantity, 2)
+        fx_rate = row.get("last_fx_rate_to_usd")
+        if not fx_rate and rates_doc is not None:
+            try:
+                fx_rate = currency_to_usd_rate(currency, rates_doc)
+            except Exception:
+                fx_rate = None
+        if currency == "USD":
+            fx_rate = 1.0
+        fx_rate_value = float(fx_rate or 1.0)
+
+        current_price_usd = round(current_price_native * fx_rate_value, 6)
+        hold_price_native = round(hold_price_usd / fx_rate_value, 6) if fx_rate_value > 0 else None
+        total_pl_usd = round((current_price_usd - hold_price_usd) * current_quantity, 2)
         holdings_docs.append(
             {
                 "uid": uid,
@@ -260,12 +297,18 @@ def build_holdings_snapshot(uid: str, display_name: str):
                 "ticker": ticker,
                 "companyName": meta.get("companyName") or meta.get("company_name") or ticker,
                 "exchange": row["exchange"] or meta.get("exchange") or "",
-                "sector": meta.get("sector") or "",
-                "industry": meta.get("industry") or "",
+                "sector": meta.get("sector"),
+                "industry": meta.get("industry"),
                 "quantity": current_quantity,
-                "holdPrice": hold_price,
-                "currentPrice": round(current_price, 2),
-                "totalPL": total_pl,
+                "currency": currency,
+                "fxRateToUsd": fx_rate_value,
+                # Legacy fields (USD)
+                "holdPrice": round(hold_price_usd, 2),
+                "currentPrice": round(current_price_usd, 2),
+                "totalPL": total_pl_usd,
+                # Native fields
+                "holdPriceNative": round(hold_price_native, 2) if hold_price_native is not None else None,
+                "currentPriceNative": round(current_price_native, 2),
                 "updatedAt": utc_now_iso(),
                 "lastTradeAt": row["lastTradeAt"],
             }
@@ -329,14 +372,53 @@ def get_enriched_watchlist(uid: str):
     metadata_by_ticker = get_metadata_by_ticker(tickers)
     live_by_symbol = get_live_prices_by_symbol(tickers)
 
+    try:
+        rates_doc = get_usd_base_rates(allow_stale_fallback=True)
+    except Exception:
+        rates_doc = None
+
     enriched = []
     for document in docs:
         ticker = document.get("ticker")
         meta = metadata_by_ticker.get(ticker, {})
         live = live_by_symbol.get(ticker, {})
-        enriched.append({**meta, **live, **document})
+        merged = {**meta, **live, **document}
+        currency = merged.get("currency") or "USD"
+        if rates_doc is not None and merged.get("price") is not None:
+            try:
+                fx_rate = currency_to_usd_rate(currency, rates_doc)
+                merged["fxRateToUsd"] = fx_rate
+                merged["currentPriceUsd"] = round(parse_float(merged.get("price")) * fx_rate, 6)
+            except Exception:
+                merged["fxRateToUsd"] = None
+                merged["currentPriceUsd"] = None
+        enriched.append(merged)
 
     return enriched
+
+
+def normalize_limit_order(document: dict):
+    return {
+        "id": str(document.get("_id")),
+        "uid": document.get("uid"),
+        "displayName": document.get("displayName"),
+        "symbol": document.get("symbol"),
+        "ticker": document.get("symbol"),
+        "companyName": document.get("companyName") or document.get("symbol"),
+        "exchange": document.get("exchange") or "",
+        "side": (document.get("side") or "").lower(),
+        "quantity": parse_int(document.get("quantity")),
+        "limitPrice": parse_float(document.get("limitPrice")),
+        "currency": document.get("currency") or "USD",
+        "status": document.get("status") or "pending",
+        "currentPrice": parse_float(document.get("lastCheckedPrice")) or None,
+        "executedPrice": parse_float(document.get("executedPrice")) or None,
+        "executedPriceUsd": parse_float(document.get("executedPriceUsd")) or None,
+        "failureReason": document.get("failureReason"),
+        "createdAt": document.get("createdAt"),
+        "updatedAt": document.get("updatedAt"),
+        "executedAt": document.get("executedAt"),
+    }
 
 
 @app.get("/health")
@@ -451,6 +533,14 @@ def get_transactions(current_user: dict = Depends(get_current_user)):
     for document in docs:
         ticker = document.get("symbol") or document.get("ticker")
         meta = metadata_by_ticker.get(ticker, {})
+        currency = document.get("currency") or meta.get("currency") or "USD"
+        price_native = parse_float(document.get("priceNative") or document.get("price_native"))
+        if price_native <= 0:
+            price_native = parse_float(document.get("price"))
+        price_usd = parse_float(document.get("priceUsd") or document.get("price_usd"))
+        if price_usd <= 0:
+            price_usd = parse_float(document.get("price"))
+        fx_rate_to_usd = parse_float(document.get("fxRateToUsd") or document.get("fx_rate_to_usd")) or None
         normalized.append(
             {
                 "id": str(document.get("_id")),
@@ -463,7 +553,12 @@ def get_transactions(current_user: dict = Depends(get_current_user)):
                 "exchange": document.get("exchange") or meta.get("exchange") or "",
                 "type": (document.get("side") or document.get("type") or "").lower(),
                 "shares": parse_int(document.get("quantity") or document.get("shares")),
-                "price": parse_float(document.get("price")),
+                # Back-compat: `price` is always USD now.
+                "price": price_usd,
+                "currency": currency,
+                "fxRateToUsd": fx_rate_to_usd,
+                "priceNative": price_native,
+                "priceUsd": price_usd,
                 "dateTime": get_transaction_datetime(document),
             }
         )
@@ -473,6 +568,8 @@ def get_transactions(current_user: dict = Depends(get_current_user)):
                 or document.get("grossValue")
                 or document.get("net_value")
                 or document.get("netValue")
+                or document.get("grossUsd")
+                or document.get("netUsd")
             )
             or round(normalized[-1]["shares"] * normalized[-1]["price"], 2)
         )
@@ -487,6 +584,15 @@ def get_watchlist(current_user: dict = Depends(get_current_user)):
 class WatchlistRequest(BaseModel):
     symbol: str
     exchange: str
+    companyName: Optional[str] = None
+
+
+class LimitOrderRequest(BaseModel):
+    symbol: str
+    exchange: str
+    side: str
+    quantity: int
+    limitPrice: float
     companyName: Optional[str] = None
 
 
@@ -541,6 +647,69 @@ def delete_watchlist_item(
     watchlists.delete_many(query)
     return {"status": "ok"}
 
+
+@app.get("/limit-orders")
+def get_limit_orders(status: Optional[str] = "pending", current_user: dict = Depends(get_current_user)):
+    query = {"uid": current_user["uid"]}
+    if status:
+        query["status"] = status
+    docs = list(limit_orders.find(query).sort("createdAt", -1))
+    return {"data": [normalize_limit_order(doc) for doc in docs]}
+
+
+@app.post("/limit-orders")
+def place_limit_order(req: LimitOrderRequest, current_user: dict = Depends(get_current_user)):
+    side = req.side.strip().upper()
+    if side not in {"BUY", "SELL"}:
+        raise HTTPException(status_code=400, detail="Limit order side must be buy or sell")
+    if req.quantity < 1:
+        raise HTTPException(status_code=400, detail="Quantity must be at least 1")
+    if req.limitPrice <= 0:
+        raise HTTPException(status_code=400, detail="Limit price must be greater than 0")
+
+    uid = current_user["uid"]
+    display_name = get_user_display_name(current_user)
+    meta = metadata.find_one({"ticker": req.symbol}, {"_id": 0}) or {}
+    live = live_prices.find_one({"symbol": req.symbol, "exchange": req.exchange}, {"_id": 0})
+    if not live:
+        live = live_prices.find_one({"symbol": req.symbol}, {"_id": 0}) or {}
+    currency = meta.get("currency") or live.get("currency") or "USD"
+    current_price = parse_float(live.get("price"))
+
+    if side == "SELL":
+        _, holdings_docs = sync_portfolio_snapshot(uid, display_name)
+        available_shares = next(
+            (
+                parse_int(item.get("quantity"))
+                for item in holdings_docs
+                if item.get("ticker") == req.symbol
+                and (not req.exchange or item.get("exchange") == req.exchange)
+            ),
+            0,
+        )
+        if req.quantity > available_shares:
+            raise HTTPException(status_code=400, detail="Not enough shares available to place sell limit order")
+
+    now = utc_now_iso()
+    document = {
+        "uid": uid,
+        "displayName": display_name,
+        "symbol": req.symbol,
+        "companyName": req.companyName or meta.get("companyName") or req.symbol,
+        "exchange": req.exchange or meta.get("exchange") or live.get("exchange") or "",
+        "side": side,
+        "quantity": req.quantity,
+        "limitPrice": round(float(req.limitPrice), 6),
+        "currency": currency,
+        "status": "pending",
+        "lastCheckedPrice": current_price if current_price > 0 else None,
+        "createdAt": now,
+        "updatedAt": now,
+    }
+    result = limit_orders.insert_one(document)
+    saved = limit_orders.find_one({"_id": result.inserted_id})
+    return {"status": "ok", "data": normalize_limit_order(saved)}
+
 @app.get("/prices/live")
 def get_live_prices():
     live_data = list(live_prices.find({}, {"_id": 0}))
@@ -554,11 +723,25 @@ def get_live_prices():
     ) if symbols else []
     metadata_by_ticker = {row.get("ticker"): row for row in metadata_rows}
 
+    try:
+        rates_doc = get_usd_base_rates(allow_stale_fallback=True)
+    except Exception:
+        rates_doc = None
+
     enriched = []
     for row in live_data:
         symbol = row.get("symbol")
         meta = metadata_by_ticker.get(symbol, {})
         merged = {**row, **meta}
+        currency = merged.get("currency") or "USD"
+        if rates_doc is not None and merged.get("price") is not None:
+            try:
+                fx_rate = currency_to_usd_rate(currency, rates_doc)
+                merged["fxRateToUsd"] = fx_rate
+                merged["currentPriceUsd"] = round(parse_float(merged.get("price")) * fx_rate, 6)
+            except Exception:
+                merged["fxRateToUsd"] = None
+                merged["currentPriceUsd"] = None
         enriched.append(merged)
 
     return enriched
@@ -602,11 +785,26 @@ def search_stocks(exchange: Optional[str] = None, q: Optional[str] = None, limit
     )
     live_by_symbol = {row.get("symbol"): row for row in live_rows}
 
+    try:
+        rates_doc = get_usd_base_rates(allow_stale_fallback=True)
+    except Exception:
+        rates_doc = None
+
     enriched = []
     for row in metadata_rows:
         ticker = row.get("ticker")
         live = live_by_symbol.get(ticker, {})
-        enriched.append({**live, **row})
+        merged = {**live, **row}
+        currency = merged.get("currency") or "USD"
+        if rates_doc is not None and merged.get("price") is not None:
+            try:
+                fx_rate = currency_to_usd_rate(currency, rates_doc)
+                merged["fxRateToUsd"] = fx_rate
+                merged["currentPriceUsd"] = round(parse_float(merged.get("price")) * fx_rate, 6)
+            except Exception:
+                merged["fxRateToUsd"] = None
+                merged["currentPriceUsd"] = None
+        enriched.append(merged)
 
     return {"data": enriched}
 
@@ -628,7 +826,9 @@ def get_simulation_status():
 
 @app.post("/simulation/tick")
 def run_simulation_tick():
-    return {"status": "ok", "data": run_simulation_cycle()}
+    tick_summary = run_price_tick()
+    order_summary = process_pending_limit_orders()
+    return {"status": "ok", "data": tick_summary, "limitOrders": order_summary}
 
 
 @app.post("/simulation/start")
@@ -675,39 +875,20 @@ class TradeRequest(BaseModel):
     symbol: str
     exchange: str
     quantity: int
-    orderType: Optional[str] = "market"
-    limitPrice: Optional[float] = None
 
 
 @app.post("/trade/buy")
 def buy_trade(req: TradeRequest, current_user: dict = Depends(get_current_user)):
     display_name = get_user_display_name(current_user)
     try:
-        order_type = (req.orderType or "market").strip().lower()
-        if order_type == "limit":
-            result = place_limit_order(
-                current_user["uid"],
-                display_name,
-                req.symbol,
-                req.exchange,
-                "BUY",
-                req.quantity,
-                req.limitPrice,
-            )
-            trade = result.get("trade")
-            order = result.get("order")
-            executed = bool(result.get("executed"))
-        else:
-            trade = execute_trade(
-                current_user["uid"],
-                display_name,
-                req.symbol,
-                req.exchange,
-                "BUY",
-                req.quantity
-            )
-            order = None
-            executed = True
+        trade = execute_trade(
+            current_user["uid"],
+            display_name,
+            req.symbol,
+            req.exchange,
+            "BUY",
+            req.quantity
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     portfolio_doc, holdings_docs = sync_portfolio_snapshot(current_user["uid"], display_name)
@@ -717,9 +898,6 @@ def buy_trade(req: TradeRequest, current_user: dict = Depends(get_current_user))
             "status": "ok",
             "data": {
                 "trade": trade,
-                "order": order,
-                "executed": executed,
-                "message": "Limit order placed successfully." if not executed else "Trade executed successfully.",
                 "portfolio": portfolio_doc,
                 "holdings": holdings_docs,
             }
@@ -731,31 +909,14 @@ def buy_trade(req: TradeRequest, current_user: dict = Depends(get_current_user))
 def sell_trade(req: TradeRequest, current_user: dict = Depends(get_current_user)):
     display_name = get_user_display_name(current_user)
     try:
-        order_type = (req.orderType or "market").strip().lower()
-        if order_type == "limit":
-            result = place_limit_order(
-                current_user["uid"],
-                display_name,
-                req.symbol,
-                req.exchange,
-                "SELL",
-                req.quantity,
-                req.limitPrice,
-            )
-            trade = result.get("trade")
-            order = result.get("order")
-            executed = bool(result.get("executed"))
-        else:
-            trade = execute_trade(
-                current_user["uid"],
-                display_name,
-                req.symbol,
-                req.exchange,
-                "SELL",
-                req.quantity
-            )
-            order = None
-            executed = True
+        trade = execute_trade(
+            current_user["uid"],
+            display_name,
+            req.symbol,
+            req.exchange,
+            "SELL",
+            req.quantity
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     portfolio_doc, holdings_docs = sync_portfolio_snapshot(current_user["uid"], display_name)
@@ -765,14 +926,43 @@ def sell_trade(req: TradeRequest, current_user: dict = Depends(get_current_user)
             "status": "ok",
             "data": {
                 "trade": trade,
-                "order": order,
-                "executed": executed,
-                "message": "Limit order placed successfully." if not executed else "Trade executed successfully.",
                 "portfolio": portfolio_doc,
                 "holdings": holdings_docs,
             }
         }
     )
+
+
+@app.post("/portfolio/reset")
+def reset_portfolio(current_user: dict = Depends(get_current_user)):
+    uid = current_user["uid"]
+    display_name = get_user_display_name(current_user)
+    now = utc_now_iso()
+
+    # Wipe all user data
+    transactions.delete_many(get_user_transaction_query(uid))
+    holdings.delete_many({"uid": uid})
+    watchlists.delete_many({"uid": uid})
+    limit_orders.delete_many({"uid": uid})
+
+    # Reset portfolio to starting capital
+    reset_doc = {
+        "uid": uid,
+        "displayName": display_name,
+        "buyingPower": DEFAULT_STARTING_CAPITAL,
+        "totalPortfolioValue": DEFAULT_STARTING_CAPITAL,
+        "investmentValue": 0,
+        "unrealisedPL": 0,
+        "todaysPL": 0,
+        "updatedAt": now,
+    }
+    portfolios.update_one(
+        {"uid": uid},
+        {"$set": reset_doc, "$setOnInsert": {"createdAt": now}},
+        upsert=True,
+    )
+
+    return {"status": "ok", "data": reset_doc}
 
 
 @app.get("/")

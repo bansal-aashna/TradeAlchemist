@@ -73,3 +73,18 @@ export function getExchangeCode(exchange: string) {
   }
   return (METADATA_CODE_BY_ID as Record<string, string>)[exchange] ?? exchange;
 }
+
+/** Maps internal metadata codes → familiar display names (e.g. "NSI" → "NSE") */
+const METADATA_TO_DISPLAY: Record<string, string> = {
+  NSI: "NSE",
+  NYQ: "NYSE",
+  NMS: "NASDAQ",
+  HKG: "HKEX",
+  TOR: "TSX",
+  JPX: "JPX",
+};
+
+export function getExchangeDisplayName(code: string): string {
+  if (!code) return code;
+  return METADATA_TO_DISPLAY[code.toUpperCase()] ?? code;
+}

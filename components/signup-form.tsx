@@ -68,7 +68,7 @@ export function SignupForm() {
       const token = await userCredential.user.getIdToken(true);
       await initCurrentUser(token);
       await getCurrentUser(token);
-      router.push("/dashboard");
+      router.replace("/dashboard");
     } catch (error) {
       const message =
         error instanceof Error
@@ -143,7 +143,7 @@ export function SignupForm() {
         </form>
 
         <p className="ta-link-row ta-auth-link-row">
-          Already have an account? <Link href="/">Sign In</Link>
+          Already have an account? <Link href="/login">Sign In</Link>
         </p>
       </Card>
     </main>

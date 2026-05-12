@@ -3,21 +3,25 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import type { TradeDraft } from "@/components/dashboard/trade-modal";
 import type { PortfolioHolding } from "@/components/dashboard/portfolio-overview";
-import { getStockHistory, searchStocks, type ApiOHLCPoint, type ApiStock } from "@/lib/api";
-import { EXCHANGE_OPTIONS, type ExchangeId } from "@/lib/exchanges";
+import {
+  getStockHistory,
+  searchStocks,
+  type ApiOHLCPoint,
+  type ApiStock,
+  type PlaceLimitOrderRequest,
+} from "@/lib/api";
+import { EXCHANGE_OPTIONS, getExchangeDisplayName, type ExchangeId } from "@/lib/exchanges";
+import { useUsdEquivalents } from "@/lib/use-usd-display";
 const rangeOptions = ["1D", "5D", "1M", "6M", "YTD", "1Y"] as const;
 type RangeOption = (typeof rangeOptions)[number];
 
 type BuyPageProps = {
   holdings?: PortfolioHolding[];
   onTradeAction: (trade: TradeDraft) => void;
-  onExecuteTrade?: (
-    trade: TradeDraft,
-    shares: number,
-    options?: { orderType?: "market" | "limit"; limitPrice?: number },
-  ) => Promise<void>;
+  onExecuteTrade?: (trade: TradeDraft, shares: number) => Promise<void>;
   buyingPower?: number;
   priceRefreshVersion?: number;
+  onPlaceLimitOrder: (request: PlaceLimitOrderRequest) => Promise<void>;
   initialStock?: {
     ticker: string;
     companyName: string;
@@ -106,8 +110,10 @@ export const BuyPage = memo(function BuyPage({
   onExecuteTrade,
   buyingPower,
   priceRefreshVersion = 0,
+  onPlaceLimitOrder,
   initialStock,
 }: BuyPageProps) {
+  const { showUsdEquivalents } = useUsdEquivalents();
   const [selectedExchange, setSelectedExchange] = useState<ExchangeId>("NSE");
   const [query, setQuery] = useState("");
   const [selectedSymbol, setSelectedSymbol] = useState("");
@@ -116,7 +122,7 @@ export const BuyPage = memo(function BuyPage({
   const [tradeMode, setTradeMode] = useState<"buy" | "sell">("buy");
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
   const [shares, setShares] = useState("0");
-  const [limitPrice, setLimitPrice] = useState("0");
+  const [limitPrice, setLimitPrice] = useState("");
   const [isTrading, setIsTrading] = useState(false);
   const [stocks, setStocks] = useState<ApiStock[]>([]);
   const [historySeries, setHistorySeries] = useState<ApiOHLCPoint[]>([]);
@@ -178,6 +184,18 @@ export const BuyPage = memo(function BuyPage({
     [selectedSymbol, stocks],
   );
   const stockCurrency = selectedStock?.currency ?? "USD";
+  const selectedPriceUsd =
+    selectedStock?.currentPriceUsd ?? (stockCurrency === "USD" ? selectedStock?.currentPrice : undefined);
+  const fxRateToUsd = selectedStock?.fxRateToUsd ?? null;
+  const limitPriceNumber = Number(limitPrice);
+  const limitPriceUsd =
+    Number.isFinite(limitPriceNumber) && limitPriceNumber > 0
+      ? stockCurrency === "USD"
+        ? limitPriceNumber
+        : fxRateToUsd
+          ? limitPriceNumber * fxRateToUsd
+          : undefined
+      : undefined;
 
   useEffect(() => {
     let active = true;
@@ -238,13 +256,6 @@ export const BuyPage = memo(function BuyPage({
   const availableSellShares =
     holdings?.find((holding) => holding.ticker === selectedStock?.symbol)?.quantity ?? 0;
   const canSell = Boolean(selectedStock && availableSellShares > 0);
-  const tradePrice = orderType === "limit" ? Number(limitPrice) || 0 : selectedStock?.currentPrice ?? 0;
-
-  useEffect(() => {
-    if (selectedStock?.currentPrice !== undefined) {
-      setLimitPrice(String(selectedStock.currentPrice));
-    }
-  }, [selectedStock?.currentPrice]);
   const priceTone =
     selectedStock?.change === undefined
       ? "neutral"
@@ -380,7 +391,7 @@ export const BuyPage = memo(function BuyPage({
                   <p className="ta-watch-preview-symbol">{stock.symbol}</p>
                   <p className="ta-watch-preview-name">{stock.companyName}</p>
                 </div>
-                <span className="ta-watch-result-exchange">{stock.exchange}</span>
+                <span className="ta-watch-result-exchange">{getExchangeDisplayName(stock.exchange)}</span>
               </button>
             ))
           ) : searchError ? (
@@ -401,6 +412,9 @@ export const BuyPage = memo(function BuyPage({
               {formatCurrency(latestHistoryPoint?.close, stockCurrency)}{" "}
               <span>{stockCurrency}</span>
             </p>
+            {showUsdEquivalents && fxRateToUsd && latestHistoryPoint?.close !== undefined ? (
+              <p className="ta-usd-equiv">{formatCurrency(latestHistoryPoint.close * fxRateToUsd, "USD")}</p>
+            ) : null}
             <p className={`ta-charts-change ${tone}`}>
               {diff >= 0 ? "+" : ""}
               {diff.toFixed(2)} ({diffPct.toFixed(2)}%) {diff >= 0 ? "▲" : "▼"} past{" "}
@@ -511,18 +525,23 @@ export const BuyPage = memo(function BuyPage({
                 </button>
               </div>
 
-              <div className="ta-trade-order-mode">
+              <div className="ta-trade-seg-wrap ta-order-type-toggle">
                 <button
                   type="button"
-                  className={`ta-trade-mode-btn ${orderType === "market" ? "active" : ""}`}
+                  className={`ta-trade-seg-btn ${orderType === "market" ? "active" : ""}`}
                   onClick={() => setOrderType("market")}
                 >
                   Market
                 </button>
                 <button
                   type="button"
-                  className={`ta-trade-mode-btn ${orderType === "limit" ? "active" : ""}`}
-                  onClick={() => setOrderType("limit")}
+                  className={`ta-trade-seg-btn ${orderType === "limit" ? "active" : ""}`}
+                  onClick={() => {
+                    setOrderType("limit");
+                    if (!limitPrice && selectedStock.currentPrice) {
+                      setLimitPrice(String(selectedStock.currentPrice));
+                    }
+                  }}
                 >
                   Limit
                 </button>
@@ -544,8 +563,8 @@ export const BuyPage = memo(function BuyPage({
                     onClick={() => {
                       if (tradeMode === "sell") {
                         setShares(String(availableSellShares));
-                      } else if (selectedStock.currentPrice && selectedStock.currentPrice > 0) {
-                        setShares(String(Math.floor((buyingPower ?? 0) / selectedStock.currentPrice)));
+                      } else if (selectedPriceUsd && selectedPriceUsd > 0) {
+                        setShares(String(Math.floor((buyingPower ?? 0) / selectedPriceUsd)));
                       }
                     }}
                   >
@@ -572,11 +591,12 @@ export const BuyPage = memo(function BuyPage({
 
               <div className="ta-trade-info">
                 <div className="ta-trade-info-row">
-                  <span>{orderType === "limit" ? "Estimated Order Value:" : "Estimated Cost:"}</span>
+                  <span>{orderType === "limit" ? "Estimated at Limit:" : "Estimated Cost:"}</span>
                   <span>
                     {formatCurrency(
-                      (Number(shares) || 0) * tradePrice,
-                      stockCurrency,
+                      (Number(shares) || 0) *
+                        (orderType === "limit" ? limitPriceUsd ?? 0 : selectedPriceUsd ?? 0),
+                      "USD",
                     )}
                   </span>
                 </div>
@@ -591,8 +611,10 @@ export const BuyPage = memo(function BuyPage({
                 className={`ta-trade-cta-btn ${tradeMode}`}
                 disabled={
                   isTrading ||
-                  !(orderType === "limit" ? tradePrice > 0 : selectedStock.currentPrice) ||
+                  !selectedStock.currentPrice ||
                   Number(shares) <= 0 ||
+                  (orderType === "limit" && (!Number.isFinite(limitPriceNumber) || limitPriceNumber <= 0)) ||
+                  (tradeMode === "buy" && (!selectedPriceUsd || selectedPriceUsd <= 0)) ||
                   (tradeMode === "sell" && Number(shares) > availableSellShares)
                 }
                 onClick={async () => {
@@ -600,6 +622,25 @@ export const BuyPage = memo(function BuyPage({
 
                   const qty = Number(shares);
                   if (Number.isNaN(qty) || qty <= 0) return;
+
+                  if (orderType === "limit") {
+                    if (!Number.isFinite(limitPriceNumber) || limitPriceNumber <= 0) return;
+                    setIsTrading(true);
+                    try {
+                      await onPlaceLimitOrder({
+                        symbol: selectedStock.symbol,
+                        exchange: selectedStock.exchange,
+                        companyName: selectedStock.companyName,
+                        side: tradeMode,
+                        quantity: qty,
+                        limitPrice: limitPriceNumber,
+                      });
+                      setShares("0");
+                    } finally {
+                      setIsTrading(false);
+                    }
+                    return;
+                  }
 
                   if (onExecuteTrade) {
                     setIsTrading(true);
@@ -611,15 +652,11 @@ export const BuyPage = memo(function BuyPage({
                             ticker: selectedStock.symbol,
                             company: selectedStock.companyName,
                             exchange: selectedStock.exchange,
-                            price: selectedStock.currentPrice,
+                            price: selectedPriceUsd ?? selectedStock.currentPrice,
                             type: "sell",
                             maxShares: availableSellShares,
                           },
                           qty,
-                          {
-                            orderType,
-                            limitPrice: orderType === "limit" ? tradePrice : undefined,
-                          },
                         );
                       } else {
                         await onExecuteTrade(
@@ -627,14 +664,10 @@ export const BuyPage = memo(function BuyPage({
                             ticker: selectedStock.symbol,
                             company: selectedStock.companyName,
                             exchange: selectedStock.exchange,
-                            price: selectedStock.currentPrice,
+                            price: selectedPriceUsd ?? selectedStock.currentPrice,
                             type: "buy",
                           },
                           qty,
-                          {
-                            orderType,
-                            limitPrice: orderType === "limit" ? tradePrice : undefined,
-                          },
                         );
                       }
                       setShares("0");
@@ -648,7 +681,7 @@ export const BuyPage = memo(function BuyPage({
                     ticker: selectedStock.symbol,
                     company: selectedStock.companyName,
                     exchange: selectedStock.exchange,
-                    price: selectedStock.currentPrice,
+                    price: selectedPriceUsd ?? selectedStock.currentPrice,
                     type: tradeMode,
                     maxShares: tradeMode === "sell" ? availableSellShares : undefined,
                   });
@@ -656,11 +689,7 @@ export const BuyPage = memo(function BuyPage({
               >
                 {isTrading
                   ? "Processing..."
-                  : orderType === "limit"
-                    ? `Place ${tradeMode === "buy" ? "Buy" : "Sell"} Limit`
-                    : tradeMode === "buy"
-                      ? "Place Buy Order"
-                      : "Place Sell Order"}
+                  : `${orderType === "limit" ? "Place Limit" : "Place"} ${tradeMode === "buy" ? "Buy" : "Sell"} Order`}
               </button>
             </article>
 

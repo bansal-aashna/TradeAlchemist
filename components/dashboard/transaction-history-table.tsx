@@ -1,5 +1,8 @@
+"use client";
+
 import { memo } from "react";
 import type { TradeDrawerStock } from "@/components/dashboard/trade-drawer";
+import { useUsdEquivalents } from "@/lib/use-usd-display";
 
 export type TransactionType = "buy" | "sell";
 
@@ -12,6 +15,9 @@ export type TransactionRecord = {
   type: TransactionType;
   shares: number;
   price: number;
+  currency?: string;
+  priceNative?: number;
+  priceUsd?: number;
   realisedPL?: number;
 };
 
@@ -48,6 +54,7 @@ export const TransactionHistoryTable = memo(function TransactionHistoryTable({
   onRowClick,
   onOpenBuyStock,
 }: TransactionHistoryTableProps) {
+  const { showUsdEquivalents } = useUsdEquivalents();
   return (
     <section className="ta-dashboard-content">
       <h2 className="ta-holdings-title">Transaction History</h2>
@@ -74,7 +81,16 @@ export const TransactionHistoryTable = memo(function TransactionHistoryTable({
                   <tr
                     key={transaction.id}
                     className="ta-clickable-row"
-                    onClick={() => onRowClick?.({ ticker: transaction.ticker, companyName: transaction.company, exchange: "", currentPrice: transaction.price })}
+                    onClick={() =>
+                      onRowClick?.({
+                        ticker: transaction.ticker,
+                        companyName: transaction.company,
+                        exchange: "",
+                        currentPrice: transaction.priceNative ?? transaction.price,
+                        currentPriceUsd: transaction.priceUsd ?? transaction.price,
+                        currency: transaction.currency,
+                      })
+                    }
                   >
                     <td>{formatDateTime(transaction.dateTime)}</td>
                     <td>
@@ -87,7 +103,9 @@ export const TransactionHistoryTable = memo(function TransactionHistoryTable({
                             ticker: transaction.ticker,
                             companyName: transaction.company,
                             exchange: transaction.exchange ?? "",
-                            currentPrice: transaction.price,
+                            currentPrice: transaction.priceNative ?? transaction.price,
+                            currentPriceUsd: transaction.priceUsd ?? transaction.price,
+                            currency: transaction.currency,
                           });
                         }}
                       >
@@ -104,7 +122,9 @@ export const TransactionHistoryTable = memo(function TransactionHistoryTable({
                             ticker: transaction.ticker,
                             companyName: transaction.company,
                             exchange: transaction.exchange ?? "",
-                            currentPrice: transaction.price,
+                            currentPrice: transaction.priceNative ?? transaction.price,
+                            currentPriceUsd: transaction.priceUsd ?? transaction.price,
+                            currency: transaction.currency,
                           });
                         }}
                       >
@@ -117,7 +137,14 @@ export const TransactionHistoryTable = memo(function TransactionHistoryTable({
                       </span>
                     </td>
                     <td>{transaction.shares}</td>
-                    <td>{formatCurrency(transaction.price)}</td>
+                    <td>
+                      <div>{formatCurrency(transaction.price)}</div>
+                      {showUsdEquivalents && transaction.priceNative !== undefined ? (
+                        <div className="ta-usd-equiv">
+                          {new Intl.NumberFormat("en-US", { style: "currency", currency: transaction.currency ?? "USD", maximumFractionDigits: 2 }).format(transaction.priceNative)}
+                        </div>
+                      ) : null}
+                    </td>
                     <td>{formatCurrency(totalValue)}</td>
                     <td className={`ta-portfolio-value ${transaction.realisedPL !== undefined && transaction.realisedPL !== 0 ? (transaction.realisedPL > 0 ? 'positive' : 'negative') : 'neutral'}`}>
                       {transaction.type === 'buy' ? '--' : (transaction.realisedPL !== undefined ? formatCurrency(transaction.realisedPL) : '--')}

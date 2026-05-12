@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from typing import Optional
 
-from db.mongo_client import live_prices, orders, portfolios, transactions
+from db.mongo_client import limit_orders, live_prices, metadata, portfolios, transactions
+from fx_rates import currency_to_usd_rate, get_usd_base_rates
 
 COMMISSION_RATE = 0.002  # 0.2%
 DEFAULT_STARTING_CAPITAL = 100000
@@ -36,7 +36,7 @@ def build_position_map(user_id):
         exchange = document.get("exchange") or ""
         side = (document.get("side") or document.get("type") or "").upper()
         quantity = parse_int(document.get("quantity") or document.get("shares"))
-        price = parse_float(document.get("price"))
+        price = parse_float(document.get("priceUsd") or document.get("price_usd") or document.get("price"))
 
         if not symbol or quantity <= 0:
             continue
@@ -62,18 +62,7 @@ def build_position_map(user_id):
     return positions
 
 
-def execute_trade(
-    user_id,
-    display_name,
-    symbol,
-    exchange,
-    side,
-    quantity,
-    execution_price: Optional[float] = None,
-    order_type: str = "MARKET",
-    limit_price: Optional[float] = None,
-    source_order_id: Optional[str] = None,
-):
+def execute_trade(user_id, display_name, symbol, exchange, side, quantity):
     if quantity < 1:
         raise ValueError("Quantity must be at least 1")
 
@@ -83,14 +72,25 @@ def execute_trade(
     if not live:
         raise ValueError("Live price not available")
 
-    price = parse_float(execution_price if execution_price is not None else live.get("price"))
-    if price <= 0:
+    price_native = parse_float(live.get("price"))
+    if price_native <= 0:
         raise ValueError("Live price not available")
 
-    gross_value = round(price * quantity, 2)
+    meta = metadata.find_one({"ticker": symbol}, {"_id": 0}) or {}
+    currency = meta.get("currency") or live.get("currency") or "USD"
+
+    try:
+        rates_doc = get_usd_base_rates()
+        fx_rate_to_usd = currency_to_usd_rate(currency, rates_doc)
+    except Exception as exc:
+        raise ValueError(f"FX rate unavailable for {currency}→USD") from exc
+
+    price_usd = round(price_native * fx_rate_to_usd, 6)
+    gross_native = round(price_native * quantity, 2)
+    gross_usd = round(price_usd * quantity, 2)
     commission_rate = 0.0
-    commission_amount = 0.0
-    net_value = gross_value
+    commission_usd = 0.0
+    net_usd = gross_usd
 
     portfolio = portfolios.find_one({"uid": user_id}, {"_id": 0}) or {
         "buyingPower": DEFAULT_STARTING_CAPITAL
@@ -103,16 +103,16 @@ def execute_trade(
         available_shares = positions.get((symbol, ""), {}).get("quantity", 0)
 
     if side == "BUY":
-        if gross_value > buying_power:
+        if gross_usd > buying_power:
             raise ValueError("Insufficient buying power")
-        buying_power = round(buying_power - gross_value, 2)
+        buying_power = round(buying_power - gross_usd, 2)
     elif side == "SELL":
         if quantity > available_shares:
             raise ValueError("Not enough shares available to sell")
         commission_rate = COMMISSION_RATE
-        commission_amount = round(gross_value * COMMISSION_RATE, 2)
-        net_value = round(gross_value - commission_amount, 2)
-        buying_power = round(buying_power + net_value, 2)
+        commission_usd = round(gross_usd * COMMISSION_RATE, 2)
+        net_usd = round(gross_usd - commission_usd, 2)
+        buying_power = round(buying_power + net_usd, 2)
     else:
         raise ValueError("Invalid trade side")
 
@@ -124,19 +124,25 @@ def execute_trade(
         "exchange": exchange or live.get("exchange") or "",
         "side": side,
         "quantity": quantity,
-        "price": price,
-        "gross_value": gross_value,
+        # Back-compat fields (USD)
+        "price": price_usd,
+        "gross_value": gross_usd,
         "commission_rate": commission_rate,
-        "commission_amount": commission_amount,
-        "net_value": net_value,
-        "order_type": order_type,
-        "limit_price": limit_price,
-        "source_order_id": source_order_id,
+        "commission_amount": commission_usd,
+        "net_value": net_usd,
+        # New fields
+        "currency": currency,
+        "fxRateToUsd": fx_rate_to_usd,
+        "priceNative": price_native,
+        "priceUsd": price_usd,
+        "grossNative": gross_native,
+        "grossUsd": gross_usd,
+        "commissionUsd": commission_usd,
+        "netUsd": net_usd,
         "timestamp": utc_now_iso(),
     }
 
-    inserted = transactions.insert_one(transaction.copy())
-    transaction["_id"] = str(inserted.inserted_id)
+    transactions.insert_one(transaction.copy())
     portfolios.update_one(
         {"uid": user_id},
         {
@@ -156,7 +162,7 @@ def execute_trade(
     return transaction
 
 
-def _limit_condition_met(side: str, current_price: float, limit_price: float) -> bool:
+def should_execute_limit_order(side, current_price, limit_price):
     if side == "BUY":
         return current_price <= limit_price
     if side == "SELL":
@@ -164,140 +170,98 @@ def _limit_condition_met(side: str, current_price: float, limit_price: float) ->
     return False
 
 
-def place_limit_order(user_id, display_name, symbol, exchange, side, quantity, limit_price):
-    if quantity < 1:
-        raise ValueError("Quantity must be at least 1")
+def process_pending_limit_orders():
+    now = utc_now_iso()
+    pending_orders = list(limit_orders.find({"status": "pending"}).sort("createdAt", 1))
+    checked = 0
+    executed = 0
+    failed = 0
 
-    limit_price = parse_float(limit_price)
-    if limit_price <= 0:
-        raise ValueError("Limit price must be greater than 0")
-
-    live = live_prices.find_one({"symbol": symbol, "exchange": exchange}, {"_id": 0})
-    if not live:
-        live = live_prices.find_one({"symbol": symbol}, {"_id": 0})
-    if not live:
-        raise ValueError("Live price not available")
-
-    current_price = parse_float(live.get("price"))
-    if current_price <= 0:
-        raise ValueError("Live price not available")
-
-    if _limit_condition_met(side, current_price, limit_price):
-        trade = execute_trade(
-            user_id,
-            display_name,
-            symbol,
-            exchange,
-            side,
-            quantity,
-            execution_price=current_price,
-            order_type="LIMIT",
-            limit_price=limit_price,
-        )
-        return {"executed": True, "trade": trade, "order": None}
-
-    if side == "BUY":
-        portfolio = portfolios.find_one({"uid": user_id}, {"_id": 0}) or {
-            "buyingPower": DEFAULT_STARTING_CAPITAL
-        }
-        buying_power = parse_float(portfolio.get("buyingPower"), DEFAULT_STARTING_CAPITAL)
-        if round(limit_price * quantity, 2) > buying_power:
-            raise ValueError("Insufficient buying power for this limit order")
-    elif side == "SELL":
-        positions = build_position_map(user_id)
-        available_shares = positions.get((symbol, exchange), {}).get("quantity", 0)
-        if available_shares == 0 and exchange:
-            available_shares = positions.get((symbol, ""), {}).get("quantity", 0)
-        if quantity > available_shares:
-            raise ValueError("Not enough shares available to sell")
-
-    order = {
-        "uid": user_id,
-        "user_id": user_id,
-        "displayName": display_name,
-        "symbol": symbol,
-        "exchange": exchange or live.get("exchange") or "",
-        "side": side,
-        "quantity": quantity,
-        "order_type": "LIMIT",
-        "limit_price": round(limit_price, 2),
-        "status": "PENDING",
-        "createdAt": utc_now_iso(),
-        "updatedAt": utc_now_iso(),
-    }
-    inserted = orders.insert_one(order.copy())
-    order["_id"] = str(inserted.inserted_id)
-    return {"executed": False, "trade": None, "order": order}
-
-
-def process_limit_orders():
-    pending_orders = list(orders.find({"status": "PENDING"}).sort("createdAt", 1).limit(500))
-    if not pending_orders:
-        return {"checked": 0, "filled": 0, "rejected": 0}
-
-    filled = 0
-    rejected = 0
     for order in pending_orders:
+        checked += 1
         symbol = order.get("symbol")
         exchange = order.get("exchange") or ""
         side = (order.get("side") or "").upper()
         quantity = parse_int(order.get("quantity"))
-        limit_price = parse_float(order.get("limit_price"))
+        limit_price = parse_float(order.get("limitPrice"))
+
         if not symbol or quantity <= 0 or limit_price <= 0 or side not in {"BUY", "SELL"}:
-            orders.update_one(
+            limit_orders.update_one(
                 {"_id": order["_id"]},
-                {"$set": {"status": "REJECTED", "reason": "Invalid order payload", "updatedAt": utc_now_iso()}},
+                {
+                    "$set": {
+                        "status": "failed",
+                        "failureReason": "Invalid limit order",
+                        "updatedAt": now,
+                    }
+                },
             )
-            rejected += 1
+            failed += 1
             continue
 
         live = live_prices.find_one({"symbol": symbol, "exchange": exchange}, {"_id": 0})
         if not live:
             live = live_prices.find_one({"symbol": symbol}, {"_id": 0})
         current_price = parse_float(live.get("price") if live else None)
-        if current_price <= 0:
-            continue
 
-        if not _limit_condition_met(side, current_price, limit_price):
+        if current_price <= 0 or not should_execute_limit_order(side, current_price, limit_price):
+            if current_price > 0:
+                limit_orders.update_one(
+                    {"_id": order["_id"]},
+                    {"$set": {"lastCheckedPrice": current_price, "updatedAt": now}},
+                )
             continue
 
         try:
-            trade = execute_trade(
-                order.get("uid"),
-                order.get("displayName") or order.get("uid"),
+            transaction = execute_trade(
+                order["uid"],
+                order.get("displayName") or order["uid"],
                 symbol,
                 exchange,
                 side,
                 quantity,
-                execution_price=current_price,
-                order_type="LIMIT",
-                limit_price=limit_price,
-                source_order_id=str(order.get("_id")),
             )
-            orders.update_one(
-                {"_id": order["_id"]},
+            transactions.update_one(
+                {
+                    "uid": order["uid"],
+                    "symbol": symbol,
+                    "exchange": transaction.get("exchange") or exchange,
+                    "timestamp": transaction.get("timestamp"),
+                },
                 {
                     "$set": {
-                        "status": "FILLED",
-                        "filledAt": utc_now_iso(),
-                        "filledPrice": current_price,
-                        "updatedAt": utc_now_iso(),
-                        "tradeId": trade.get("_id"),
+                        "orderType": "limit",
+                        "limitOrderId": str(order["_id"]),
+                        "limitPrice": limit_price,
                     }
                 },
             )
-            filled += 1
-        except ValueError as exc:
-            orders.update_one(
+            limit_orders.update_one(
                 {"_id": order["_id"]},
                 {
                     "$set": {
-                        "status": "REJECTED",
-                        "reason": str(exc),
-                        "updatedAt": utc_now_iso(),
+                        "status": "executed",
+                        "executedAt": transaction.get("timestamp") or now,
+                        "executedPrice": transaction.get("priceNative"),
+                        "executedPriceUsd": transaction.get("priceUsd"),
+                        "lastCheckedPrice": current_price,
+                        "updatedAt": now,
                     }
                 },
             )
-            rejected += 1
+            executed += 1
+        except Exception as exc:
+            limit_orders.update_one(
+                {"_id": order["_id"]},
+                {
+                    "$set": {
+                        "status": "failed",
+                        "failureReason": str(exc),
+                        "lastCheckedPrice": current_price,
+                        "updatedAt": now,
+                    }
+                },
+            )
+            failed += 1
 
-    return {"checked": len(pending_orders), "filled": filled, "rejected": rejected}
+    return {"checked": checked, "executed": executed, "failed": failed}

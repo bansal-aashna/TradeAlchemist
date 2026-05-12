@@ -171,21 +171,46 @@ export type ApiTransaction = {
   priceUsd?: number;
 };
 
+export type ApiLimitOrder = {
+  id: string;
+  uid?: string;
+  ticker: string;
+  symbol?: string;
+  companyName: string;
+  exchange: string;
+  side: "buy" | "sell";
+  quantity: number;
+  limitPrice: number;
+  currency?: string;
+  status: "pending" | "executed" | "failed" | "cancelled";
+  currentPrice?: number | null;
+  executedPrice?: number | null;
+  executedPriceUsd?: number | null;
+  failureReason?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  executedAt?: string;
+};
+
+export type PlaceLimitOrderRequest = {
+  symbol: string;
+  exchange: string;
+  side: "buy" | "sell";
+  quantity: number;
+  limitPrice: number;
+  companyName?: string;
+};
+
 export type ExecuteTradeRequest = {
   symbol: string;
   exchange: string;
   quantity: number;
-  orderType?: "market" | "limit";
-  limitPrice?: number;
 };
 
 export type ApiTradeExecution = {
   trade?: Record<string, unknown>;
   portfolio?: ApiPortfolio | null;
   holdings?: ApiHolding[];
-  order?: Record<string, unknown>;
-  executed?: boolean;
-  message?: string;
 };
 
 async function fetchJson(path: string) {
@@ -350,7 +375,9 @@ function normalizeStockItem(item: Record<string, unknown>): ApiStock | null {
     percentChange:
       asNumber(item.percentChange) ??
       asNumber(item.changePercent) ??
-      asNumber(item.pctChange),
+      asNumber(item.pctChange) ??
+      asNumber(item.percent_change) ??
+      asNumber(item.change_percent),
     open: asNumber(item.open),
     high: asNumber(item.high),
     low: asNumber(item.low),
@@ -451,7 +478,11 @@ function normalizeWatchlistItem(item: Record<string, unknown>): ApiWatchlistItem
     currentPriceUsd: asNumber(item.currentPriceUsd) ?? asNumber(item.priceUsd) ?? asNumber(item.price_usd),
     prevClose: asNumber(item.prevClose) ?? asNumber(item.previousClose),
     change: asNumber(item.change),
-    percentChange: asNumber(item.percentChange) ?? asNumber(item.pctChange),
+    percentChange:
+      asNumber(item.percentChange) ??
+      asNumber(item.pctChange) ??
+      asNumber(item.percent_change) ??
+      asNumber(item.change_percent),
     open: asNumber(item.open),
     high: asNumber(item.high),
     low: asNumber(item.low),
@@ -499,6 +530,45 @@ function normalizeTransactionItem(item: Record<string, unknown>): ApiTransaction
   };
 }
 
+function normalizeLimitOrderItem(item: Record<string, unknown>): ApiLimitOrder | null {
+  const id = asString(item.id) ?? asString(item._id);
+  const ticker = asString(item.ticker) ?? asString(item.symbol);
+  const side = (asString(item.side) ?? "").toLowerCase();
+  const quantity = asNumber(item.quantity);
+  const limitPrice = asNumber(item.limitPrice) ?? asNumber(item.limit_price);
+
+  if (!id || !ticker || (side !== "buy" && side !== "sell") || quantity === undefined || limitPrice === undefined) {
+    return null;
+  }
+
+  const rawStatus = (asString(item.status) ?? "pending").toLowerCase();
+  const status: ApiLimitOrder["status"] =
+    rawStatus === "executed" || rawStatus === "failed" || rawStatus === "cancelled"
+      ? rawStatus
+      : "pending";
+
+  return {
+    id,
+    ticker,
+    symbol: asString(item.symbol),
+    uid: asString(item.uid),
+    companyName: asString(item.companyName) ?? asString(item.company_name) ?? ticker,
+    exchange: asString(item.exchange) ?? "",
+    side,
+    quantity,
+    limitPrice,
+    currency: asString(item.currency),
+    status,
+    currentPrice: asNumber(item.currentPrice) ?? asNumber(item.current_price) ?? null,
+    executedPrice: asNumber(item.executedPrice) ?? asNumber(item.executed_price) ?? null,
+    executedPriceUsd: asNumber(item.executedPriceUsd) ?? asNumber(item.executed_price_usd) ?? null,
+    failureReason: asString(item.failureReason) ?? asString(item.failure_reason),
+    createdAt: asString(item.createdAt) ?? asString(item.created_at),
+    updatedAt: asString(item.updatedAt) ?? asString(item.updated_at),
+    executedAt: asString(item.executedAt) ?? asString(item.executed_at),
+  };
+}
+
 export async function getBackendHealth(): Promise<BackendHealth> {
   try {
     const health = await fetchJson("/health");
@@ -529,12 +599,6 @@ export async function getBackendHealth(): Promise<BackendHealth> {
   }
 }
 
-export async function getLivePrices() {
-  const payload = await fetchJson("/prices/live");
-  const items = getArrayPayload(payload);
-  return items.map(normalizeStockItem).filter((item): item is ApiStock => item !== null);
-}
-
 export async function searchStocks(params: { exchange?: string; q?: string } = {}) {
   const path = process.env.NEXT_PUBLIC_API_STOCK_SEARCH_PATH ?? "/stocks/search";
   const query = new URLSearchParams();
@@ -563,6 +627,12 @@ export async function getStockHistory(params: { symbol: string; range?: string }
     .map(normalizeHistoryItem)
     .filter((item): item is ApiOHLCPoint => item !== null)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
+export async function getLivePrices() {
+  const payload = await fetchJson("/prices/live");
+  const items = getArrayPayload(payload);
+  return items.map(normalizeStockItem).filter((item): item is ApiStock => item !== null);
 }
 
 export async function initCurrentUser(token: string) {
@@ -600,6 +670,29 @@ export async function getWatchlist(token: string) {
   return getArrayPayload(payload)
     .map(normalizeWatchlistItem)
     .filter((item): item is ApiWatchlistItem => item !== null);
+}
+
+export async function getLimitOrders(token: string, status = "pending") {
+  const query = new URLSearchParams();
+  if (status) {
+    query.set("status", status);
+  }
+  const payload = await fetchAuthenticatedJson(
+    `/limit-orders${query.toString() ? `?${query.toString()}` : ""}`,
+    token,
+    "GET",
+  );
+  return getArrayPayload(payload)
+    .map(normalizeLimitOrderItem)
+    .filter((item): item is ApiLimitOrder => item !== null);
+}
+
+export async function placeLimitOrder(token: string, request: PlaceLimitOrderRequest) {
+  const payload = await fetchAuthenticatedJsonWithBody("/limit-orders", token, "POST", request);
+  const data = payload.data;
+  return data && typeof data === "object"
+    ? normalizeLimitOrderItem(data as Record<string, unknown>)
+    : null;
 }
 
 export async function addWatchlistItem(
@@ -661,9 +754,6 @@ export async function executeBuyTrade(token: string, request: ExecuteTradeReques
   const record = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
   return {
     trade: record?.trade && typeof record.trade === "object" ? record.trade as Record<string, unknown> : undefined,
-    order: record?.order && typeof record.order === "object" ? record.order as Record<string, unknown> : undefined,
-    executed: typeof record?.executed === "boolean" ? record.executed : true,
-    message: typeof record?.message === "string" ? record.message : undefined,
     portfolio:
       record?.portfolio && typeof record.portfolio === "object"
         ? (record.portfolio as ApiPortfolio)
@@ -683,9 +773,6 @@ export async function executeSellTrade(token: string, request: ExecuteTradeReque
   const record = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
   return {
     trade: record?.trade && typeof record.trade === "object" ? record.trade as Record<string, unknown> : undefined,
-    order: record?.order && typeof record.order === "object" ? record.order as Record<string, unknown> : undefined,
-    executed: typeof record?.executed === "boolean" ? record.executed : true,
-    message: typeof record?.message === "string" ? record.message : undefined,
     portfolio:
       record?.portfolio && typeof record.portfolio === "object"
         ? (record.portfolio as ApiPortfolio)
@@ -759,4 +846,9 @@ export async function stopSimulationTicker() {
   }
 
   return response.json() as Promise<Record<string, unknown>>;
+}
+
+export async function resetPortfolio(token: string) {
+  const payload = await fetchAuthenticatedJson("/portfolio/reset", token, "POST");
+  return payload as { status: string; data: ApiPortfolio };
 }

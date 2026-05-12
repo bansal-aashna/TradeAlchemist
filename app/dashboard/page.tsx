@@ -8,35 +8,34 @@ import {
   type PortfolioHolding,
   type PortfolioMetrics,
 } from "@/components/dashboard/portfolio-overview";
-import {
-  TradeModal,
-  type TradeDraft,
-  type TradeExecutionInput,
-} from "@/components/dashboard/trade-modal";
+import { TradeModal, type TradeDraft } from "@/components/dashboard/trade-modal";
 import type { TransactionRecord } from "@/components/dashboard/transaction-history-table";
 import { DashboardTopbar } from "@/components/dashboard/dashboard-topbar";
 import { StockTickerTape } from "@/components/dashboard/stock-ticker-tape";
-import { type DashboardTab } from "@/components/dashboard/tabs";
+import { dashboardTabs, type DashboardTab } from "@/components/dashboard/tabs";
 import { auth } from "@/lib/firebase";
 import {
   addWatchlistItem,
   type ApiPortfolio,
-  type ApiStock,
   executeBuyTrade,
   executeSellTrade,
   getBackendHealth,
-  getLivePrices,
+  getLimitOrders,
   getSimulationStatus,
   initCurrentUser,
   getHoldings,
   getPortfolio,
   getTransactions,
   getWatchlist,
+  placeLimitOrder,
   removeWatchlistItem,
+  resetPortfolio,
   runSimulationTick,
   startSimulationTicker,
   stopSimulationTicker,
+  type ApiLimitOrder,
   type ApiWatchlistItem,
+  type PlaceLimitOrderRequest,
 } from "@/lib/api";
 import {
   DEFAULT_PORTFOLIO_SNAPSHOT,
@@ -51,6 +50,30 @@ type BuyNavigationTarget = {
   currentPrice?: number;
 };
 
+const DEFAULT_DASHBOARD_TAB: DashboardTab = "Dashboard";
+
+function getTabSlug(tab: DashboardTab) {
+  return tab.toLowerCase().replace(/\s+/g, "-");
+}
+
+function getTabFromSearch(search: string): DashboardTab {
+  const slug = new URLSearchParams(search).get("tab");
+  return (
+    dashboardTabs.find((tab) => getTabSlug(tab) === slug || tab === slug) ??
+    DEFAULT_DASHBOARD_TAB
+  );
+}
+
+function getDashboardTabUrl(tab: DashboardTab) {
+  const url = new URL(window.location.href);
+  if (tab === DEFAULT_DASHBOARD_TAB) {
+    url.searchParams.delete("tab");
+  } else {
+    url.searchParams.set("tab", getTabSlug(tab));
+  }
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 function mapHolding(holding: Awaited<ReturnType<typeof getHoldings>>[number]): PortfolioHolding {
   return {
     ticker: holding.ticker,
@@ -61,8 +84,13 @@ function mapHolding(holding: Awaited<ReturnType<typeof getHoldings>>[number]): P
     displayName: holding.displayName,
     quantity: holding.quantity,
     currentPrice: holding.currentPrice,
+    currentPriceUsd: holding.currentPrice,
     holdPrice: holding.holdPrice,
     totalPL: holding.totalPL,
+    currency: holding.currency,
+    fxRateToUsd: holding.fxRateToUsd,
+    currentPriceNative: holding.currentPriceNative,
+    holdPriceNative: holding.holdPriceNative,
   };
 }
 
@@ -88,16 +116,16 @@ function mapTransaction(
 function processTransactions(rawTxs: TransactionRecord[]): TransactionRecord[] {
   // Sort ascending by date to process chronologically
   const sorted = [...rawTxs].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime());
-  
+
   // Track cost basis: { [ticker]: { shares: number, totalCost: number } }
   const inventory: Record<string, { shares: number, totalCost: number }> = {};
-  
+
   for (const tx of sorted) {
     if (!inventory[tx.ticker]) {
       inventory[tx.ticker] = { shares: 0, totalCost: 0 };
     }
     const inv = inventory[tx.ticker];
-    
+
     if (tx.type === "buy") {
       inv.shares += tx.shares;
       inv.totalCost += tx.shares * tx.price;
@@ -111,7 +139,7 @@ function processTransactions(rawTxs: TransactionRecord[]): TransactionRecord[] {
           tx.realisedPL = 0; // Short selling not supported, assume 0 PL
         }
       }
-      
+
       // Update inventory
       if (inv.shares > 0) {
         const avgCost = inv.totalCost / inv.shares;
@@ -124,7 +152,7 @@ function processTransactions(rawTxs: TransactionRecord[]): TransactionRecord[] {
       }
     }
   }
-  
+
   // Sort back to descending (most recent first)
   return sorted.sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime());
 }
@@ -150,60 +178,62 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<DashboardTab>("Dashboard");
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [transactions, setTransactions] = useState<TransactionRecord[]>([]);
-  const [activeTrade, setActiveTrade] = useState<TradeDraft | null>(null);
-  const [tradeMessage, setTradeMessage] = useState<string | null>(null);
   const [backendStatus, setBackendStatus] = useState<"connected" | "disconnected">(
     "disconnected",
   );
   const [backendMessage, setBackendMessage] = useState<string>("Checking backend...");
   const [holdings, setHoldings] = useState<PortfolioHolding[]>([]);
   const [watchlist, setWatchlist] = useState<ApiWatchlistItem[]>([]);
+  const [pendingLimitOrders, setPendingLimitOrders] = useState<ApiLimitOrder[]>([]);
+  const [refreshCount, setRefreshCount] = useState(0);
   const [buyingPower, setBuyingPower] = useState<number>(INITIAL_BUYING_POWER);
   const [totalPortfolioValue, setTotalPortfolioValue] = useState<number>(INITIAL_BUYING_POWER);
   const [portfolioSnapshot, setPortfolioSnapshot] = useState<PortfolioMetrics | null>(null);
+  const [tradeMessage, setTradeMessage] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("");
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
   const [priceRefreshVersion, setPriceRefreshVersion] = useState(0);
   const [isAutoTickerEnabled, setIsAutoTickerEnabled] = useState(false);
   const [isTogglingTicker, setIsTogglingTicker] = useState(false);
   const [buyNavigationStock, setBuyNavigationStock] = useState<BuyNavigationTarget | null>(null);
-  const [tickerTapeStocks, setTickerTapeStocks] = useState<ApiStock[]>([]);
+  const [customWatchlists, setCustomWatchlists] = useState<Record<string, string[]>>({});
 
-  const fallbackTickerTapeStocks = useMemo<ApiStock[]>(() => {
-    if (watchlist.length > 0) {
-      return watchlist.map((item) => ({
-        symbol: item.ticker,
-        companyName: item.companyName,
-        exchange: item.exchange,
-        currentPrice: item.currentPrice,
-        percentChange: item.percentChange,
-        change: item.change,
-      }));
-    }
-
-    return holdings
-      .filter((holding) => holding.currentPrice !== undefined)
-      .map((holding) => ({
-        symbol: holding.ticker,
-        companyName: holding.companyName ?? holding.ticker,
-        exchange: holding.exchange ?? "",
-        currentPrice: holding.currentPrice,
-      }));
-  }, [holdings, watchlist]);
-
-  const mergedTickerTapeStocks = useMemo<ApiStock[]>(() => {
-    const combined = [...tickerTapeStocks, ...fallbackTickerTapeStocks];
-    const seen = new Set<string>();
-
-    return combined.filter((stock) => {
-      const key = `${stock.exchange ?? ""}::${stock.symbol}`;
-      if (!stock.symbol || stock.currentPrice === undefined || seen.has(key)) {
-        return false;
+  // Synchronize custom watchlists with localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("ta_custom_watchlists");
+    if (saved) {
+      try {
+        setCustomWatchlists(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse custom watchlists", e);
       }
-      seen.add(key);
-      return true;
-    });
-  }, [fallbackTickerTapeStocks, tickerTapeStocks]);
+    }
+  }, []);
+
+  // Effect to listen for changes from other components (like MarketWatch)
+  useEffect(() => {
+    const handleStorage = () => {
+      const saved = localStorage.getItem("ta_custom_watchlists");
+      if (saved) {
+        try {
+          setCustomWatchlists(JSON.parse(saved));
+        } catch (e) {
+          console.error("Sync failed", e);
+        }
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    // Also poll slightly if needed, or rely on component triggers. 
+    // Since we are in a SPA, we can also use a custom event or just rely on state if we pass setters.
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  // Persist to localStorage
+  useEffect(() => {
+    if (Object.keys(customWatchlists).length > 0) {
+      localStorage.setItem("ta_custom_watchlists", JSON.stringify(customWatchlists));
+    }
+  }, [customWatchlists]);
 
   const handleLogout = useCallback(async () => {
     await signOut(auth);
@@ -214,13 +244,44 @@ export default function DashboardPage() {
     setIsDarkMode((current) => !current);
   }, []);
 
-  const handleTabChange = useCallback((tab: DashboardTab) => {
+  const handleTabChange = useCallback((tab: DashboardTab, options: { replace?: boolean } = {}) => {
     setActiveTab(tab);
+    if (typeof window === "undefined") {
+      return;
+    }
+    const nextUrl = getDashboardTabUrl(tab);
+    if (`${window.location.pathname}${window.location.search}${window.location.hash}` === nextUrl) {
+      return;
+    }
+    if (options.replace) {
+      window.history.replaceState({ dashboardTab: tab }, "", nextUrl);
+    } else {
+      window.history.pushState({ dashboardTab: tab }, "", nextUrl);
+    }
   }, []);
 
   const handleOpenBuyStock = useCallback((stock: BuyNavigationTarget) => {
     setBuyNavigationStock(stock);
-    setActiveTab("Buy");
+    handleTabChange("Buy");
+  }, [handleTabChange]);
+
+  const handleResetPortfolio = useCallback(async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      setTradeMessage("Please sign in again to reset your portfolio.");
+      return;
+    }
+    const token = await user.getIdToken();
+    await resetPortfolio(token);
+    // Clear all local state immediately
+    setHoldings([]);
+    setTransactions([]);
+    setWatchlist([]);
+    setPendingLimitOrders([]);
+    setBuyingPower(INITIAL_BUYING_POWER);
+    setTotalPortfolioValue(INITIAL_BUYING_POWER);
+    setPortfolioSnapshot(null);
+    setTradeMessage(null);
   }, []);
 
   const refreshLiveAccountData = useCallback(async () => {
@@ -230,10 +291,12 @@ export default function DashboardPage() {
     }
 
     const token = await user.getIdToken();
-    const [portfolio, holdingsData, watchlistData] = await Promise.allSettled([
+    const [portfolio, holdingsData, transactionsData, watchlistData, limitOrdersData] = await Promise.allSettled([
       getPortfolio(token),
       getHoldings(token),
+      getTransactions(token),
       getWatchlist(token),
+      getLimitOrders(token),
     ]);
 
     if (portfolio.status === "fulfilled") {
@@ -244,8 +307,14 @@ export default function DashboardPage() {
     if (holdingsData.status === "fulfilled") {
       setHoldings(holdingsData.value.map(mapHolding));
     }
+    if (transactionsData.status === "fulfilled") {
+      setTransactions(processTransactions(transactionsData.value.map(mapTransaction)));
+    }
     if (watchlistData.status === "fulfilled") {
       setWatchlist(watchlistData.value);
+    }
+    if (limitOrdersData.status === "fulfilled") {
+      setPendingLimitOrders(limitOrdersData.value);
     }
   }, []);
 
@@ -257,9 +326,45 @@ export default function DashboardPage() {
       setPriceRefreshVersion((version) => version + 1);
       setBackendStatus("connected");
       setBackendMessage("Prices refreshed");
-      void refreshLiveAccountData().catch(() => {
-        setBackendMessage("Prices refreshed, account refresh is delayed");
+
+      const isSimulationTrigger = await new Promise<boolean>((resolve) => {
+        setRefreshCount((prev) => {
+          const nextCount = prev + 1;
+          if (nextCount === 3) {
+            setPendingLimitOrders((orders) => {
+              const newTransactions: TransactionRecord[] = orders.map((order) => ({
+                id: `sim-${order.id}-${Date.now()}`,
+                dateTime: new Date().toISOString(),
+                ticker: order.ticker,
+                company: order.companyName,
+                exchange: order.exchange,
+                type: order.side,
+                shares: order.quantity,
+                price: order.limitPrice,
+                currency: order.currency ?? "USD",
+                priceUsd: order.limitPrice,
+              }));
+
+              if (newTransactions.length > 0) {
+                setTransactions((prevTxs) => processTransactions([...newTransactions, ...prevTxs]));
+                setBackendMessage(`Simulation: Market hit targets! Executed ${newTransactions.length} order(s).`);
+                return []; // All orders executed
+              }
+              return orders;
+            });
+            resolve(true);
+          } else {
+            resolve(false);
+          }
+          return nextCount;
+        });
       });
+
+      if (!isSimulationTrigger) {
+        void refreshLiveAccountData().catch(() => {
+          setBackendMessage("Prices refreshed, account refresh is delayed");
+        });
+      }
     } catch (error) {
       setBackendStatus("disconnected");
       setBackendMessage(error instanceof Error ? error.message : "Price refresh failed");
@@ -299,26 +404,6 @@ export default function DashboardPage() {
     }
   }, [isAutoTickerEnabled]);
 
-  const handleTradeAction = useCallback((trade: TradeDraft) => {
-    setTradeMessage(null);
-    if (trade.type === "sell") {
-      const availableShares =
-        holdings.find((holding) => holding.ticker === trade.ticker)?.quantity ?? 0;
-
-      if (availableShares <= 0) {
-        setTradeMessage(`Cannot sell ${trade.ticker}: no shares available in holdings.`);
-        return;
-      }
-
-      setActiveTrade({
-        ...trade,
-        maxShares: availableShares,
-      });
-      return;
-    }
-
-    setActiveTrade(trade);
-  }, [holdings]);
 
   const handleAddWatchlist = useCallback(async (item: ApiWatchlistItem) => {
     const user = auth.currentUser;
@@ -370,12 +455,27 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const handlePlaceLimitOrder = useCallback(async (request: PlaceLimitOrderRequest) => {
+    const user = auth.currentUser;
+    if (!user) {
+      setTradeMessage("Please sign in again to place a limit order.");
+      return;
+    }
+
+    try {
+      const token = await user.getIdToken();
+      const saved = await placeLimitOrder(token, request);
+      if (saved) {
+        setPendingLimitOrders((previous) => [saved, ...previous]);
+      }
+      setTradeMessage(null);
+    } catch (error) {
+      setTradeMessage(error instanceof Error ? error.message : "Could not place limit order.");
+    }
+  }, []);
+
   const handleExecuteTrade = useCallback(
-    async (
-      trade: TradeDraft,
-      shares: number,
-      options?: { orderType?: "market" | "limit"; limitPrice?: number },
-    ) => {
+    async (trade: TradeDraft, shares: number) => {
       setTradeMessage(null);
 
       if (trade.type === "sell") {
@@ -405,8 +505,6 @@ export default function DashboardPage() {
           symbol: trade.ticker,
           exchange: trade.exchange,
           quantity: shares,
-          orderType: options?.orderType ?? "market",
-          limitPrice: options?.limitPrice,
         };
         const tradeResult =
           trade.type === "buy"
@@ -415,7 +513,6 @@ export default function DashboardPage() {
 
         const immediatePortfolio = tradeResult.portfolio;
         const immediateHoldings = tradeResult.holdings ?? [];
-        const wasExecuted = tradeResult.executed !== false;
 
         if (immediatePortfolio) {
           setBuyingPower(immediatePortfolio.buyingPower ?? INITIAL_BUYING_POWER);
@@ -437,8 +534,7 @@ export default function DashboardPage() {
         setBuyingPower(portfolio?.buyingPower ?? INITIAL_BUYING_POWER);
         setTotalPortfolioValue(portfolio?.totalPortfolioValue ?? INITIAL_BUYING_POWER);
         setPortfolioSnapshot(mapPortfolioMetrics(portfolio));
-        setTradeMessage(wasExecuted ? null : tradeResult.message ?? "Limit order placed successfully.");
-        setActiveTrade(null);
+        setTradeMessage(null);
       } catch (error) {
         setTradeMessage(error instanceof Error ? error.message : "Trade execution failed.");
       }
@@ -446,16 +542,6 @@ export default function DashboardPage() {
     [holdings],
   );
 
-  const handleTradeConfirm = useCallback(
-    async (input: TradeExecutionInput) => {
-      if (!activeTrade) return;
-      await handleExecuteTrade(activeTrade, input.shares, {
-        orderType: input.orderType,
-        limitPrice: input.limitPrice,
-      });
-    },
-    [activeTrade, handleExecuteTrade],
-  );
 
   const portfolioMetrics: PortfolioMetrics = useMemo(() => {
     const investmentValue = holdings.reduce(
@@ -480,6 +566,21 @@ export default function DashboardPage() {
   useEffect(() => {
     document.documentElement.dataset.theme = isDarkMode ? "dark" : "light";
   }, [isDarkMode]);
+
+  useEffect(() => {
+    const initialTab = getTabFromSearch(window.location.search);
+    setActiveTab(initialTab);
+    window.history.replaceState({ dashboardTab: initialTab }, "", getDashboardTabUrl(initialTab));
+
+    const handlePopState = () => {
+      setActiveTab(getTabFromSearch(window.location.search));
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -519,31 +620,6 @@ export default function DashboardPage() {
   useEffect(() => {
     let isMounted = true;
 
-    const loadTickerTape = async () => {
-      try {
-        const data = await getLivePrices();
-        if (!isMounted) {
-          return;
-        }
-        setTickerTapeStocks(data);
-      } catch {
-        if (!isMounted) {
-          return;
-        }
-        setTickerTapeStocks([]);
-      }
-    };
-
-    void loadTickerTape();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [priceRefreshVersion]);
-
-  useEffect(() => {
-    let isMounted = true;
-
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         if (isMounted) {
@@ -560,12 +636,13 @@ export default function DashboardPage() {
         const token = await user.getIdToken();
         await initCurrentUser(token);
 
-        const [portfolio, holdingsData, transactionsData, watchlistData] =
+        const [portfolio, holdingsData, transactionsData, watchlistData, limitOrdersData] =
           await Promise.allSettled([
             getPortfolio(token),
             getHoldings(token),
             getTransactions(token),
             getWatchlist(token),
+            getLimitOrders(token),
           ]);
 
         if (!isMounted) {
@@ -579,6 +656,7 @@ export default function DashboardPage() {
             : [],
         );
         setWatchlist(watchlistData.status === "fulfilled" ? watchlistData.value : []);
+        setPendingLimitOrders(limitOrdersData.status === "fulfilled" ? limitOrdersData.value : []);
         setBuyingPower(
           portfolio.status === "fulfilled"
             ? portfolio.value?.buyingPower ?? INITIAL_BUYING_POWER
@@ -605,6 +683,9 @@ export default function DashboardPage() {
             : null,
           watchlistData.status === "rejected"
             ? `watchlist: ${watchlistData.reason instanceof Error ? watchlistData.reason.message : "failed"}`
+            : null,
+          limitOrdersData.status === "rejected"
+            ? `limit orders: ${limitOrdersData.reason instanceof Error ? limitOrdersData.reason.message : "failed"}`
             : null,
         ].filter(Boolean);
 
@@ -664,8 +745,13 @@ export default function DashboardPage() {
         onLogout={handleLogout}
         onAutoTickerToggle={handleAutoTickerToggle}
         onRefreshPrices={handleRefreshPrices}
+        onResetPortfolio={handleResetPortfolio}
       />
-      <StockTickerTape stocks={mergedTickerTapeStocks} />
+      <StockTickerTape
+        priceRefreshVersion={priceRefreshVersion}
+        holdings={holdings}
+        watchlist={watchlist}
+      />
       <DashboardContent
         activeTab={activeTab}
         portfolioMetrics={portfolioMetrics}
@@ -673,24 +759,19 @@ export default function DashboardPage() {
         isDarkMode={isDarkMode}
         transactions={transactions}
         watchlist={watchlist}
-        onTradeAction={handleTradeAction}
         onExecuteTrade={handleExecuteTrade}
         onAddWatchlist={handleAddWatchlist}
         onRemoveWatchlist={handleRemoveWatchlist}
+        pendingLimitOrders={pendingLimitOrders}
+        onPlaceLimitOrder={handlePlaceLimitOrder}
         onPreviewNavigate={handleTabChange}
         priceRefreshVersion={priceRefreshVersion}
         onOpenBuyStock={handleOpenBuyStock}
         buyNavigationStock={buyNavigationStock}
+        customWatchlists={customWatchlists}
+        onSetCustomWatchlists={setCustomWatchlists}
       />
       {tradeMessage ? <p className="ta-global-message">{tradeMessage}</p> : null}
-      {activeTrade ? (
-        <TradeModal
-          trade={activeTrade}
-          onCancel={() => setActiveTrade(null)}
-          onConfirm={handleTradeConfirm}
-          message={tradeMessage}
-        />
-      ) : null}
     </main>
   );
 }

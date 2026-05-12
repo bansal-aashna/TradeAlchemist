@@ -49,7 +49,7 @@ export function LoginForm() {
       const token = await userCredential.user.getIdToken();
       await initCurrentUser(token);
       await getCurrentUser(token);
-      router.push("/dashboard");
+      router.replace("/dashboard");
     } catch (error) {
       const message =
         error instanceof Error
